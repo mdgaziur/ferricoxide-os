@@ -53,10 +53,7 @@ pub extern "C" fn kernel_main(multiboot_info_addr: usize) -> ! {
     VGA_DRAWER.lock().unwrap_ref_mut().buffer.clear();
 
     info!("Welcome to {}!", NAME);
-
-    for x in 1..101 {
-        info!("{}", x);
-    }
+    
     let mut executor = Executor::new();
     executor.spawn(Task::new(print_keypresses()));
     executor.run();
