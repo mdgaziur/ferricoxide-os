@@ -9,12 +9,11 @@ use crate::task::executor::Executor;
 use crate::task::keyboard::print_keypresses;
 use crate::task::Task;
 
-
-
-use logging::vga::{TextWriter};
+use logging::vga::TextWriter;
 use mm::{HEAP_ALLOCATOR, HEAP_SIZE, HEAP_START};
 
-use crate::vga::VGADrawer;
+use crate::mm::display_heap_stats;
+use crate::vga::{VGA_DRAWER, VGADrawer};
 use utils::multiboot::load_multiboot_info;
 
 #[macro_use]
@@ -43,6 +42,7 @@ pub extern "C" fn kernel_main(multiboot_info_addr: usize) -> ! {
         HEAP_ALLOCATOR.lock().init(HEAP_START as *mut u8, HEAP_SIZE);
     }
     info!("Initialized heap allocator");
+    display_heap_stats();
 
     interrupts::init_interrupts(&mut memory_controller);
     info!("Initialized interrupts");
@@ -50,8 +50,13 @@ pub extern "C" fn kernel_main(multiboot_info_addr: usize) -> ! {
     VGADrawer::init(&multiboot_info);
     TextWriter::init(&multiboot_info);
     info!("Initialized VGA Text writer");
+    VGA_DRAWER.lock().unwrap_ref_mut().buffer.clear();
 
     info!("Welcome to {}!", NAME);
+
+    for x in 1..101 {
+        info!("{}", x);
+    }
     let mut executor = Executor::new();
     executor.spawn(Task::new(print_keypresses()));
     executor.run();

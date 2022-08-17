@@ -1,5 +1,3 @@
-
-
 #[derive(Debug, Eq, PartialEq)]
 pub enum PossiblyUninit<T> {
     Init(T),

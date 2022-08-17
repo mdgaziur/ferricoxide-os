@@ -13,9 +13,21 @@ mod stack_allocator;
 
 pub const HEAP_START: usize = 0o_000_001_000_000_0000;
 pub const HEAP_SIZE: usize = 100 * 1024 * 1024; // 100 MiB
+#[allow(non_upper_case_globals)]
+pub const MiB: usize = 1024 * 1024;
 
 #[global_allocator]
 pub static HEAP_ALLOCATOR: LockedHeap = LockedHeap::empty();
+
+pub fn display_heap_stats() {
+    let alloc = HEAP_ALLOCATOR.lock();
+
+    info!(
+        "Heap size: {}MiB, Free: {}MiB",
+        alloc.size() / MiB,
+        alloc.free() / MiB
+    );
+}
 
 pub struct MemoryController<'a> {
     active_table: paging::ActivePageTable,

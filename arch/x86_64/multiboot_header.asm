@@ -11,9 +11,9 @@ header_start:
 	dw 5															; Type: Framebuffer
 	dw 0															; Flags
 	dd 20															; size
-	dd 1280															; Width
-	dd 700															; Height
-	dd 32															; Depth
+	dd 0															; Width
+	dd 0															; Height
+	dd 0															; Depth
 
 	align 8
 

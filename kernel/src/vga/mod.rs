@@ -1,3 +1,4 @@
+use alloc::vec;
 use multiboot2::{BootInformation, FramebufferType};
 use spin::Mutex;
 use utils::possibly_uninit::PossiblyUninit;
@@ -41,7 +42,7 @@ pub struct VGAFramebuffer {
 impl VGAFramebuffer {
     pub unsafe fn new(addr: u64, height: usize, width: usize, pitch: usize, bpp: usize) -> Self {
         Self {
-            buffer: &mut *(addr as *mut u8),
+            buffer: addr as *mut u8,
             height,
             width,
             pitch,
@@ -52,13 +53,70 @@ impl VGAFramebuffer {
     pub fn clear(&mut self) {
         for y in 0..self.height {
             for x in 0..self.width {
-                self.write_pixel(Pixel {
-                    r: 0,
-                    g: 0,
-                    b: 0,
-                }, x, y);
+                self.write_pixel(Pixel { r: 0, g: 0, b: 0 }, x, y);
             }
         }
+    }
+
+    pub fn move_up(&mut self, row_count: usize) {
+        let secondary_buffer = vec![0u8; self.height * self.pitch];
+        let mut y = row_count;
+        while y < self.height {
+            for m in 0..row_count {
+                for x in 0..self.width {
+                    let current_pixel = self.get_pixel(x, y + m);
+                    let pixel_offset = x * (self.bpp / 8) + (y + m - row_count) * self.pitch;
+                    let pixel_addr =
+                        (secondary_buffer.as_ptr() as usize + pixel_offset) as *mut u8;
+
+                    unsafe {
+                        *pixel_addr = current_pixel.r;
+                        *pixel_addr.offset(1) = current_pixel.g;
+                        *pixel_addr.offset(2) = current_pixel.b;
+                    }
+                }
+            }
+
+            y += row_count;
+        }
+
+        for pos_y in self.height - row_count..self.height {
+            self.clear_y(pos_y);
+        }
+
+        unsafe {
+            core::ptr::copy_nonoverlapping(
+                secondary_buffer.as_ptr(),
+                self.buffer,
+                self.height * self.pitch,
+            );
+        }
+    }
+
+    fn clear_y(&mut self, pos_y: usize) {
+        for pos_x in 0..self.width {
+            self.write_pixel(Pixel { r: 0, g: 0, b: 0 }, pos_x, pos_y);
+        }
+    }
+
+    fn get_pixel(&self, pos_x: usize, pos_y: usize) -> Pixel {
+        assert!(pos_x < self.width);
+        assert!(pos_y < self.height);
+
+        let pixel_addr =
+            (self.buffer as usize + pos_x * (self.bpp / 8) + pos_y * self.pitch) as *mut u8;
+
+        let r;
+        let g;
+        let b;
+
+        unsafe {
+            r = *pixel_addr;
+            g = *pixel_addr.offset(1);
+            b = *pixel_addr.offset(2);
+        }
+
+        Pixel { r, g, b }
     }
 
     pub fn write_pixel(&mut self, pixel: Pixel, pos_x: usize, pos_y: usize) {
@@ -80,8 +138,9 @@ impl VGAFramebuffer {
 /// It is safe to share vga framebuffer between threads
 unsafe impl Send for VGAFramebuffer {}
 
+#[derive(Debug)]
 pub struct Pixel {
-    pub(crate) r: u8,
-    pub(crate) g: u8,
-    pub(crate) b: u8,
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
 }

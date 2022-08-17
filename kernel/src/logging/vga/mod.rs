@@ -1,5 +1,4 @@
 #[forbid(unsafe_code)]
-
 mod bufferwriter;
 mod textmodewriter;
 
@@ -10,9 +9,6 @@ use lazy_static::lazy_static;
 use multiboot2::{BootInformation, FramebufferType};
 use spin::Mutex;
 use x86_64::instructions::interrupts::without_interrupts;
-
-
-
 
 lazy_static! {
     pub static ref WRITER: Mutex<TextWriter> = Mutex::new(TextWriter::uninit());

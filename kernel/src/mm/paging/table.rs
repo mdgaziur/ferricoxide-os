@@ -25,26 +25,6 @@ impl<L> Table<L>
 where
     L: HierarchicalTable,
 {
-    pub fn next_table_create<A>(
-        &mut self,
-        index: usize,
-        allocator: &mut A,
-    ) -> &mut Table<L::NextLevel>
-    where
-        A: FrameAllocator,
-    {
-        if self.next_table(index).is_none() {
-            assert!(
-                !self.entries[index].flags().contains(EntryFlags::HUGE_PAGE),
-                "mapping code does not support huge pages"
-            );
-            let frame = allocator.allocate_frame().expect("no frames available");
-            self.entries[index].set(frame, EntryFlags::PRESENT | EntryFlags::WRITABLE);
-            self.next_table_mut(index).unwrap().zero();
-        }
-        self.next_table_mut(index).unwrap()
-    }
-
     fn next_table_address(&self, index: usize) -> Option<usize> {
         let entry_flags = self[index].flags();
         if entry_flags.contains(EntryFlags::PRESENT) && !entry_flags.contains(EntryFlags::HUGE_PAGE)
@@ -64,6 +44,26 @@ where
     pub fn next_table_mut(&mut self, index: usize) -> Option<&mut Table<L::NextLevel>> {
         self.next_table_address(index)
             .map(|address| unsafe { &mut *(address as *mut _) })
+    }
+
+    pub fn next_table_create<A>(
+        &mut self,
+        index: usize,
+        allocator: &mut A,
+    ) -> &mut Table<L::NextLevel>
+        where
+            A: FrameAllocator,
+    {
+        if self.next_table(index).is_none() {
+            assert!(
+                !self.entries[index].flags().contains(EntryFlags::HUGE_PAGE),
+                "mapping code does not support huge pages"
+            );
+            let frame = allocator.allocate_frame().expect("no frames available");
+            self.entries[index].set(frame, EntryFlags::PRESENT | EntryFlags::WRITABLE);
+            self.next_table_mut(index).unwrap().zero();
+        }
+        self.next_table_mut(index).unwrap()
     }
 }
 

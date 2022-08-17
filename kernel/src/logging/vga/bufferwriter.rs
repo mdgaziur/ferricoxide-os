@@ -1,12 +1,8 @@
 use crate::vga::{Pixel, VGA_DRAWER};
 use alloc::vec;
 use alloc::vec::Vec;
-use core::fmt::{Write};
-
-use font8x8::unicode::BasicFonts;
+use core::fmt::Write;
 use font8x8::{UnicodeFonts, BASIC_FONTS};
-use crate::{serial_print, serial_println};
-
 
 const FONT_WIDTH: usize = 8;
 const FONT_HEIGHT: usize = FONT_WIDTH;
@@ -21,6 +17,7 @@ pub struct Buffer {
     buffer: Vec<Vec<[u8; 8]>>,
     cols: usize,
     rows: usize,
+    cur_row: usize,
     cur_col: usize,
 }
 
@@ -30,6 +27,7 @@ impl Buffer {
             buffer: vec![vec![SPACE_CHAR; cols]; rows],
             cols,
             rows,
+            cur_row: 0,
             cur_col: 0,
         }
     }
@@ -39,8 +37,7 @@ impl Buffer {
             match ch {
                 '\n' => {
                     self.new_line();
-                    self.new_line();
-                },
+                }
                 _ => self.write_byte(ch),
             }
         }
@@ -55,12 +52,31 @@ impl Buffer {
     }
 
     fn write_byte(&mut self, ch: char) {
-        self.buffer[self.rows - 1][self.cur_col] = Self::get_bytearray_for_char(ch);
+        let ch_bytearray = Self::get_bytearray_for_char(ch);
+
+        self.draw_bitmap(&ch_bytearray);
+        self.buffer[self.cur_row][self.cur_col] = Self::get_bytearray_for_char(ch);
 
         self.cur_col += 1;
         if self.cur_col >= self.cols {
             self.new_line();
-            self.new_line();
+        }
+    }
+
+    fn draw_bitmap(&self, bitmap: &[u8; 8]) {
+        let mut drawer_binding = VGA_DRAWER.lock();
+        let drawer = &mut drawer_binding.unwrap_ref_mut().buffer;
+
+        let mut y_pos = self.cur_row * 8;
+        for scanline in bitmap {
+            for bit_idx in 0..FONT_WIDTH {
+                let bit = scanline >> bit_idx & 1;
+
+                if bit == 1 {
+                    drawer.write_pixel(PIXEL, self.cur_col * 8 + bit_idx + 1, y_pos);
+                }
+            }
+            y_pos += 1;
         }
     }
 
@@ -71,20 +87,29 @@ impl Buffer {
     }
 
     fn new_line(&mut self) {
-        for row in 1..self.rows {
-            for col in 0..self.cols {
-                self.buffer[row - 1][col] = self.buffer[row][col];
+        if self.cur_row + 1 >= self.rows {
+            for row in 1..self.rows {
+                for col in 0..self.cols {
+                    self.buffer[row - 1][col] = self.buffer[row][col];
+                }
             }
-        }
 
+            self.cur_row = self.rows - 1;
+            self.clear_row(self.cur_row);
+            VGA_DRAWER
+                .lock()
+                .unwrap_ref_mut()
+                .buffer
+                .move_up(FONT_HEIGHT);
+        } else {
+            self.cur_row += 1;
+        }
         self.cur_col = 0;
-        self.clear_row(self.rows - 1);
     }
 }
 
 pub struct BufferWriter {
     buffer: Buffer,
-    width: usize,
 }
 
 impl BufferWriter {
@@ -94,37 +119,6 @@ impl BufferWriter {
 
         Self {
             buffer: Buffer::new(rows, cols),
-            width,
-        }
-    }
-
-    fn commit(&self) {
-        let mut drawer_binding = VGA_DRAWER.lock();
-        let drawer = &mut drawer_binding.unwrap_ref_mut().buffer;
-        drawer.clear();
-
-        for (row_idx, row) in self.buffer.buffer.iter().enumerate() {
-            for (col_idx, col) in row.iter().enumerate() {
-                if col == &[0u8; 8] { continue }
-                let mut y_pos = row_idx * 8;
-                let x_pos = col_idx * 8;
-
-                for ch_bits in col {
-                    for bit_idx in 0..FONT_WIDTH {
-                        let bit = (ch_bits >> bit_idx & 1) == 1;
-
-                        if bit {
-                            drawer.write_pixel(
-                                PIXEL,
-                                x_pos + bit_idx + 1,
-                                 y_pos,
-                            );
-                        }
-                    }
-
-                    y_pos += 1;
-                }
-            }
         }
     }
 }
@@ -132,7 +126,6 @@ impl BufferWriter {
 impl Write for BufferWriter {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
         self.buffer.write_string(s);
-        self.commit();
         Ok(())
     }
 }

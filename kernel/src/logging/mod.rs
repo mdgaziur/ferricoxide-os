@@ -38,6 +38,12 @@ macro_rules! info {
 }
 
 #[macro_export]
+macro_rules! debug {
+    ($fmt:expr) => (#[cfg(debug_assertions)] print!("\x1B[1;32m[ Debug ]\x1B[0m", "[ Debug ]", concat!($fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => (#[cfg(debug_assertions)] print!("\x1B[1;32m[ Debug ]\x1B[0m", "[ Debug ]", concat!($fmt, "\n"), $($arg)*));
+}
+
+#[macro_export]
 macro_rules! error {
     ($fmt:expr) => (print!("\x1B[1;31m[ Error ]\x1B[0m", "[ Error ]", concat!($fmt, "\n")));
     ($fmt:expr, $($arg:tt)*) => (print!("\x1B[1;31m[ Error ]\x1B[0m", "[ Error ]", concat!($fmt, "\n"), $($arg)*));
