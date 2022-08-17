@@ -21,7 +21,7 @@ run: $(iso)
 	@qemu-system-x86_64 -bios /usr/share/edk2-ovmf/x64/OVMF.fd -cdrom $(iso) -d cpu_reset -serial stdio -no-reboot -no-shutdown
 
 run_bios: $(iso)
-	@qemu-system-x86_64 -cdrom $(iso) -d cpu_reset -serial stdio -no-reboot -no-shutdown -s -m 512M
+	@qemu-system-x86_64 -cdrom $(iso) -d cpu_reset -serial stdio -no-reboot -no-shutdown -s
 
 gdb:
 	@gdb "$(kernel)" -ex "target remote :1234"
