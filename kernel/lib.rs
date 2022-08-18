@@ -8,12 +8,14 @@ extern crate alloc;
 use crate::task::executor::Executor;
 use crate::task::keyboard::print_keypresses;
 use crate::task::Task;
+use alloc::vec;
+use alloc::vec::Vec;
 
 use logging::vga::TextWriter;
 use mm::{HEAP_ALLOCATOR, HEAP_SIZE, HEAP_START};
 
 use crate::mm::display_heap_stats;
-use crate::vga::{VGA_DRAWER, VGADrawer};
+use crate::vga::{VGADrawer, VGA_DRAWER};
 use utils::multiboot::load_multiboot_info;
 
 #[macro_use]
@@ -49,7 +51,7 @@ pub extern "C" fn kernel_main(multiboot_info_addr: usize) -> ! {
 
     VGADrawer::init(&multiboot_info);
     info!("Initialized VGA drawer");
-    
+
     VGA_DRAWER.lock().unwrap_ref_mut().buffer.clear();
     info!("Cleared VGA drawer");
 
@@ -57,7 +59,17 @@ pub extern "C" fn kernel_main(multiboot_info_addr: usize) -> ! {
     info!("Initialized VGA Text writer");
 
     info!("Welcome to {}!", NAME);
-    
+
+    // TODO: make sure that the assertion doesn't fail and get rid of this code
+    let v = vec![
+        0u8;
+        (multiboot_info.framebuffer_tag().unwrap().pitch
+            * multiboot_info.framebuffer_tag().unwrap().height) as usize
+    ];
+    for val in v {
+        assert_eq!(val, 0);
+    }
+
     let mut executor = Executor::new();
     executor.spawn(Task::new(print_keypresses()));
     executor.run();
