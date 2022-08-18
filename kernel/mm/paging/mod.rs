@@ -120,7 +120,7 @@ impl ActivePageTable {
         temporary_page: &mut TemporaryPage,
         f: F,
     ) where
-        F: FnOnce(&mut ActivePageTable),
+        F: FnOnce(&mut Mapper),
     {
         {
             let backup = Frame::containing_address(crate::arch::commands::read_cr3().0 .0);
