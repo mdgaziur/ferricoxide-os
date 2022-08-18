@@ -36,7 +36,7 @@ $(kernel): kernel $(assembly_object_files) $(linker_script)
 	@ld -n --gc-sections -T $(linker_script) -o $(kernel) $(assembly_object_files) $(rust_kernel)
 
 kernel:
-	@RUST_TARGET_PATH=$(shell pwd) cargo build --target $(target).json --release
+	@RUST_TARGET_PATH=$(shell pwd) cargo build --target arch/$(arch)/$(target).json --release
 
 build/arch/$(arch)/%.o: arch/$(arch)/%.asm
 	@mkdir -p $(shell dirname $@)
