@@ -26,7 +26,7 @@ pub fn get_kernel_start_end(boot_info: &BootInformation) -> (usize, usize) {
 
 pub fn get_multiboot_info_start_end(boot_info: &BootInformation) -> (usize, usize) {
     let multiboot_start = boot_info.start_address();
-    let multiboot_end = boot_info.start_address() + boot_info.total_size();
+    let multiboot_end = boot_info.start_address() + boot_info.total_size() - 1;
 
     (multiboot_start, multiboot_end)
 }
