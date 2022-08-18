@@ -52,9 +52,6 @@ impl Buffer {
     }
 
     fn write_byte(&mut self, ch: char) {
-        let ch_bytearray = Self::get_bytearray_for_char(ch);
-
-        self.draw_bitmap(&ch_bytearray);
         self.buffer[self.cur_row][self.cur_col] = Self::get_bytearray_for_char(ch);
 
         self.cur_col += 1;
@@ -63,17 +60,17 @@ impl Buffer {
         }
     }
 
-    fn draw_bitmap(&self, bitmap: &[u8; 8]) {
+    fn draw_bitmap(&self, bitmap: &[u8; 8], col: usize, row: usize) {
         let mut drawer_binding = VGA_DRAWER.lock();
         let drawer = &mut drawer_binding.unwrap_ref_mut().buffer;
 
-        let mut y_pos = self.cur_row * 8;
+        let mut y_pos = row * 8;
         for scanline in bitmap {
             for bit_idx in 0..FONT_WIDTH {
                 let bit = scanline >> bit_idx & 1;
 
                 if bit == 1 {
-                    drawer.write_pixel(PIXEL, self.cur_col * 8 + bit_idx + 1, y_pos);
+                    drawer.write_pixel(PIXEL, col * 8 + bit_idx + 1, y_pos);
                 }
             }
             y_pos += 1;
@@ -106,6 +103,14 @@ impl Buffer {
         }
         self.cur_col = 0;
     }
+
+    fn commit(&self) {
+        for (row_idx, row) in self.buffer.iter().enumerate() {
+            for (col_idx, col) in row.iter().enumerate() {
+                self.draw_bitmap(col, col_idx, row_idx);
+            }
+        }
+    }
 }
 
 pub struct BufferWriter {
@@ -126,6 +131,7 @@ impl BufferWriter {
 impl Write for BufferWriter {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
         self.buffer.write_string(s);
+        self.buffer.commit();
         Ok(())
     }
 }
