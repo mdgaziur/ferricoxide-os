@@ -51,8 +51,8 @@ where
         index: usize,
         allocator: &mut A,
     ) -> &mut Table<L::NextLevel>
-        where
-            A: FrameAllocator,
+    where
+        A: FrameAllocator,
     {
         if self.next_table(index).is_none() {
             assert!(

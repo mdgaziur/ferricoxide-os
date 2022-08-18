@@ -66,8 +66,7 @@ impl VGAFramebuffer {
                 for x in 0..self.width {
                     let current_pixel = self.get_pixel(x, y + m);
                     let pixel_offset = x * (self.bpp / 8) + (y + m - row_count) * self.pitch;
-                    let pixel_addr =
-                        (secondary_buffer.as_ptr() as usize + pixel_offset) as *mut u8;
+                    let pixel_addr = (secondary_buffer.as_ptr() as usize + pixel_offset) as *mut u8;
 
                     unsafe {
                         *pixel_addr = current_pixel.r;
