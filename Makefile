@@ -1,7 +1,7 @@
 arch ?= x86_64
-kernel := build/codename_hammer-$(arch).bin
-iso := build/codename_hammer-$(arch).iso
-target := codename_hammer-$(arch)
+kernel := build/ferricoxide_os-$(arch).bin
+iso := build/ferricoxide_os-$(arch).iso
+target := ferricoxide_os-$(arch)
 rust_kernel := target/$(target)/release/libkernel.a
 
 linker_script := arch/$(arch)/linker.ld
