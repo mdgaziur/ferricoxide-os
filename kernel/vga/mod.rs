@@ -1,4 +1,5 @@
 use alloc::vec;
+use alloc::vec::Vec;
 use multiboot2::{BootInformation, FramebufferType};
 use spin::Mutex;
 use utils::possibly_uninit::PossiblyUninit;
@@ -32,6 +33,7 @@ impl VGADrawer {
 
 #[derive(Debug)]
 pub struct VGAFramebuffer {
+    secondary_buffer: Vec<u8>,
     buffer: *mut u8,
     height: usize,
     width: usize,
@@ -42,6 +44,7 @@ pub struct VGAFramebuffer {
 impl VGAFramebuffer {
     pub unsafe fn new(addr: u64, height: usize, width: usize, pitch: usize, bpp: usize) -> Self {
         Self {
+            secondary_buffer: vec![0; height * pitch],
             buffer: addr as *mut u8,
             height,
             width,
@@ -59,14 +62,14 @@ impl VGAFramebuffer {
     }
 
     pub fn move_up(&mut self, row_count: usize) {
-        let secondary_buffer = vec![0u8; self.height * self.pitch];
         let mut y = row_count;
         while y < self.height {
             for m in 0..row_count {
                 for x in 0..self.width {
                     let current_pixel = self.get_pixel(x, y + m);
                     let pixel_offset = x * (self.bpp / 8) + (y + m - row_count) * self.pitch;
-                    let pixel_addr = (secondary_buffer.as_ptr() as usize + pixel_offset) as *mut u8;
+                    let pixel_addr =
+                        (self.secondary_buffer.as_ptr() as usize + pixel_offset) as *mut u8;
 
                     unsafe {
                         *pixel_addr = current_pixel.r;
@@ -81,14 +84,6 @@ impl VGAFramebuffer {
 
         for pos_y in self.height - row_count..self.height {
             self.clear_y(pos_y);
-        }
-
-        unsafe {
-            core::ptr::copy_nonoverlapping(
-                secondary_buffer.as_ptr(),
-                self.buffer,
-                self.height * self.pitch,
-            );
         }
     }
 
@@ -122,13 +117,24 @@ impl VGAFramebuffer {
         assert!(pos_x < self.width);
         assert!(pos_y < self.height);
 
-        let pixel_addr =
-            (self.buffer as usize + pos_x * (self.bpp / 8) + pos_y * self.pitch) as *mut u8;
+        let pixel_addr = (self.secondary_buffer.as_ptr() as usize
+            + pos_x * (self.bpp / 8)
+            + pos_y * self.pitch) as *mut u8;
 
         unsafe {
             *pixel_addr = pixel.r;
             *pixel_addr.offset(1) = pixel.g;
             *pixel_addr.offset(2) = pixel.b;
+        }
+    }
+
+    pub fn commit(&mut self) {
+        unsafe {
+            core::ptr::copy_nonoverlapping(
+                self.secondary_buffer.as_ptr(),
+                self.buffer,
+                self.height * self.pitch,
+            );
         }
     }
 }
