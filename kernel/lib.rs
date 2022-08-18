@@ -60,16 +60,6 @@ pub extern "C" fn kernel_main(multiboot_info_addr: usize) -> ! {
 
     info!("Welcome to {}!", NAME);
 
-    // TODO: make sure that the assertion doesn't fail and get rid of this code
-    let v = vec![
-        0u8;
-        (multiboot_info.framebuffer_tag().unwrap().pitch
-            * multiboot_info.framebuffer_tag().unwrap().height) as usize
-    ];
-    for val in v {
-        assert_eq!(val, 0);
-    }
-
     let mut executor = Executor::new();
     executor.spawn(Task::new(print_keypresses()));
     executor.run();

@@ -36,7 +36,7 @@ impl<'a> AreaFrameAllocator<'a> {
     fn choose_next_area(&mut self) {
         self.current_area = self
             .memory_map_tag
-            .all_memory_areas()
+            .memory_areas()
             .filter(|area| {
                 let address = area.start_address() + area.size() - 1;
                 Frame::containing_address(address as usize) >= self.next_free_frame
