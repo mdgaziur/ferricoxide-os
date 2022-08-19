@@ -1,4 +1,7 @@
+pub mod registers;
+
 use core::arch::asm;
+use crate::arch::cpu::registers::Registers;
 
 pub struct CPU;
 
@@ -18,6 +21,10 @@ impl CPU {
     pub fn without_interrupts<F>(f: F)
         where F: Fn() {
         x86_64::instructions::interrupts::without_interrupts(f);
+    }
+
+    pub fn dump_registers() {
+        Registers::read_regs().dump_regs();
     }
 
     pub fn halt() -> ! {
