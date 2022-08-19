@@ -20,7 +20,6 @@ mod arch;
 mod panicking;
 mod task;
 mod vga;
-mod process;
 
 #[allow(unused)]
 static NAME: &str = "FerricOxide OS";
