@@ -15,5 +15,6 @@ pub fn panic_handler(panic_info: &PanicInfo) -> ! {
         error!("Location: {}", location);
     }
 
+    CPU::dump_registers();
     CPU::halt();
 }
