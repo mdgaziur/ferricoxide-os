@@ -1,7 +1,7 @@
-use crate::mm::paging::entry::EntryFlags;
-use crate::mm::paging::{ActivePageTable, Page, PageIter};
-use crate::mm::FrameAllocator;
-use crate::mm::PAGE_SIZE;
+use crate::arch::x86_64::mm::paging::entry::EntryFlags;
+use crate::arch::x86_64::mm::paging::{ActivePageTable, Page, PageIter};
+use crate::arch::x86_64::mm::FrameAllocator;
+use crate::arch::x86_64::mm::PAGE_SIZE;
 
 pub struct StackAllocator {
     range: PageIter,

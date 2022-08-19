@@ -1,7 +1,7 @@
 use lazy_static::lazy_static;
 use spin::Mutex;
 use uart_16550::SerialPort;
-use x86_64::instructions::interrupts::without_interrupts;
+use crate::arch::cpu::CPU;
 
 lazy_static! {
     pub static ref QEMU_SERIAL: Mutex<SerialPort> = {
@@ -15,7 +15,7 @@ lazy_static! {
 pub fn print(args: core::fmt::Arguments) {
     use core::fmt::Write;
 
-    without_interrupts(|| {
+    CPU::without_interrupts(|| {
         QEMU_SERIAL
             .lock()
             .write_fmt(args)

@@ -1,12 +1,14 @@
-use crate::arch::x86_64_utils::msr::MSR;
 use core::arch::asm;
+use x86_64::registers::model_specific::Msr;
 
 pub fn enable_nxe_bit() {
     let nxe_bit = 1 << 11;
-    let mut msr = MSR(3221225600);
+    let mut msr = Msr::new(3221225600);
 
-    let efer = msr.rdmsr();
-    msr.wrmsr(efer | nxe_bit);
+    unsafe {
+        let efer = msr.read();
+        msr.write(efer | nxe_bit);
+    }
 }
 
 pub fn enable_write_protect_bit() {

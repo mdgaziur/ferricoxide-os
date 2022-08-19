@@ -1,9 +1,9 @@
-use crate::arch::commands::halt_loop;
 use core::panic::PanicInfo;
+use crate::arch::cpu::CPU;
 
 #[panic_handler]
 pub fn panic_handler(panic_info: &PanicInfo) -> ! {
-    x86_64::instructions::interrupts::disable();
+    CPU::disable_interrupts();
     error!("Disabled interrupts");
 
     error!("Kernel panic: {}", panic_info);
@@ -15,5 +15,5 @@ pub fn panic_handler(panic_info: &PanicInfo) -> ! {
         error!("Location: {}", location);
     }
 
-    halt_loop();
+    CPU::halt();
 }

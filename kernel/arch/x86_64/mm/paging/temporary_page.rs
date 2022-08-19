@@ -1,8 +1,8 @@
-use crate::mm::paging::entry::EntryFlags;
-use crate::mm::paging::table::{Level1, Table};
-use crate::mm::paging::{ActivePageTable, Page, VirtualAddress};
-use crate::mm::Frame;
-use crate::mm::FrameAllocator;
+use crate::arch::x86_64::mm::paging::entry::EntryFlags;
+use crate::arch::x86_64::mm::paging::table::{Level1, Table};
+use crate::arch::x86_64::mm::paging::{ActivePageTable, Page, VirtualAddress};
+use crate::arch::x86_64::mm::Frame;
+use crate::arch::x86_64::mm::FrameAllocator;
 
 pub struct TemporaryPage {
     page: Page,

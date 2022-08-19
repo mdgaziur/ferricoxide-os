@@ -1,7 +1,7 @@
-use crate::mm::area_frame_allocator::AreaFrameAllocator;
-use crate::mm::paging::entry::EntryFlags;
-use crate::mm::paging::{Page, PhysicalAddress};
-use crate::mm::stack_allocator::{Stack, StackAllocator};
+use crate::arch::x86_64::mm::area_frame_allocator::AreaFrameAllocator;
+use crate::arch::x86_64::mm::paging::entry::EntryFlags;
+use crate::arch::x86_64::mm::paging::{Page, PhysicalAddress};
+use crate::arch::x86_64::mm::stack_allocator::{Stack, StackAllocator};
 use linked_list_allocator::LockedHeap;
 use multiboot2::BootInformation;
 use once::assert_has_not_been_called;

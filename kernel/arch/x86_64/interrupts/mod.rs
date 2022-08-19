@@ -3,8 +3,7 @@ mod gdt;
 use gdt::Gdt;
 use lazy_static::lazy_static;
 
-use crate::arch::commands::halt_loop;
-use crate::mm::MemoryController;
+use crate::arch::x86_64::mm::MemoryController;
 use pic8259::ChainedPics;
 use spin::{Mutex, Once};
 use x86_64::instructions::hlt;
@@ -16,6 +15,7 @@ use x86_64::structures::gdt::SegmentSelector;
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode};
 use x86_64::structures::tss::TaskStateSegment;
 use x86_64::VirtAddr;
+use crate::arch::cpu::CPU;
 
 static TSS: Once<TaskStateSegment> = Once::new();
 static GDT: Once<Gdt> = Once::new();
@@ -149,7 +149,7 @@ extern "x86-interrupt" fn page_fault_handler(
         stack_frame, error_code
     );
     // TODO: handle page fault from userland applications(in future)
-    halt_loop();
+    CPU::halt();
 }
 
 extern "x86-interrupt" fn keyboard_interrupt_handler(_: InterruptStackFrame) {

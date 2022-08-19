@@ -1,9 +1,9 @@
-use crate::arch::VirtAddr;
-use crate::mm::paging::entry::EntryFlags;
-use crate::mm::paging::table::{Level4, Table, P4};
-use crate::mm::paging::{Page, PhysicalAddress, VirtualAddress, ENTRY_COUNT};
-use crate::mm::FrameAllocator;
-use crate::mm::{Frame, PAGE_SIZE};
+use x86_64::VirtAddr;
+use crate::arch::x86_64::mm::paging::entry::EntryFlags;
+use crate::arch::x86_64::mm::paging::table::{Level4, Table, P4};
+use crate::arch::x86_64::mm::paging::{Page, PhysicalAddress, VirtualAddress, ENTRY_COUNT};
+use crate::arch::x86_64::mm::FrameAllocator;
+use crate::arch::x86_64::mm::{Frame, PAGE_SIZE};
 
 pub struct Mapper {
     p4: &'static mut Table<Level4>,
@@ -116,7 +116,7 @@ impl Mapper {
 
         let frame = p1[page.p1_index()].pointed_frame().unwrap();
         p1[page.p1_index()].set_unused();
-        crate::arch::commands::tlb_flush(VirtAddr(page.start_address()));
+        x86_64::instructions::tlb::flush(VirtAddr::new(page.start_address() as u64));
 
         allocator.deallocate_frame(frame);
     }

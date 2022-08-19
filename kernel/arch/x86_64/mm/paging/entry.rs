@@ -1,4 +1,4 @@
-use crate::mm::Frame;
+use crate::arch::x86_64::mm::Frame;
 use bitflags::bitflags;
 use multiboot2::{ElfSection, ElfSectionFlags};
 

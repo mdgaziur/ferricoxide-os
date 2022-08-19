@@ -4,7 +4,7 @@ use alloc::sync::Arc;
 use alloc::task::Wake;
 use core::task::{Context, Poll, Waker};
 use crossbeam_queue::ArrayQueue;
-use x86_64::instructions::interrupts::enable_and_hlt;
+use crate::arch::cpu::CPU;
 
 pub struct Executor {
     tasks: BTreeMap<TaskId, Task>,
@@ -60,11 +60,11 @@ impl Executor {
     }
 
     fn sleep_if_idle(&self) {
-        x86_64::instructions::interrupts::disable();
+        CPU::disable_interrupts();
         if self.task_queue.is_empty() {
-            enable_and_hlt();
+            CPU::enable_interrupts_and_halt();
         } else {
-            x86_64::instructions::interrupts::disable();
+            CPU::disable_interrupts();
         }
     }
 }

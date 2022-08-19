@@ -1,7 +1,7 @@
-use crate::mm::paging::entry::{Entry, EntryFlags};
-use crate::mm::paging::ENTRY_COUNT;
+use crate::arch::x86_64::mm::paging::entry::{Entry, EntryFlags};
+use crate::arch::x86_64::mm::paging::ENTRY_COUNT;
 
-use crate::mm::FrameAllocator;
+use crate::arch::x86_64::mm::FrameAllocator;
 
 use core::marker::PhantomData;
 use core::ops::{Index, IndexMut};

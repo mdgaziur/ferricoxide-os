@@ -10,7 +10,7 @@ use lazy_static::lazy_static;
 use multiboot2::{BootInformation, FramebufferType};
 use spin::Mutex;
 use utils::possibly_uninit::PossiblyUninit;
-use x86_64::instructions::interrupts::without_interrupts;
+use crate::arch::cpu::CPU;
 
 lazy_static! {
     pub static ref WRITER: Mutex<TextWriter> = Mutex::new(TextWriter::uninit());
@@ -65,7 +65,7 @@ enum Writer {
 
 #[doc(hidden)]
 pub fn print(args: core::fmt::Arguments) {
-    without_interrupts(|| {
+    CPU::without_interrupts(|| {
         WRITER.lock().write_fmt(args).unwrap();
         let mut drawer_binding = VGA_DRAWER.lock();
         if let PossiblyUninit::Init(drawer) = &mut *drawer_binding {

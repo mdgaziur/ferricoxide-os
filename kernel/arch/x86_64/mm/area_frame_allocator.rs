@@ -1,4 +1,4 @@
-use crate::mm::{Frame, FrameAllocator};
+use crate::arch::x86_64::mm::{Frame, FrameAllocator};
 use multiboot2::{MemoryArea, MemoryMapTag};
 
 pub struct AreaFrameAllocator<'a> {

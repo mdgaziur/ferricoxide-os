@@ -1,13 +1,15 @@
-use crate::mm::paging::entry::EntryFlags;
-use crate::mm::paging::mapper::Mapper;
-use crate::mm::paging::temporary_page::TemporaryPage;
-use crate::mm::FrameAllocator;
-use crate::mm::{Frame, PAGE_SIZE};
+use crate::arch::x86_64::mm::paging::entry::EntryFlags;
+use crate::arch::x86_64::mm::paging::mapper::Mapper;
+use crate::arch::x86_64::mm::paging::temporary_page::TemporaryPage;
+use crate::arch::x86_64::mm::FrameAllocator;
+use crate::arch::x86_64::mm::{Frame, PAGE_SIZE};
 
-use crate::arch::PhysAddr;
 use core::ops::{Add, Deref, DerefMut};
 pub use entry::*;
 use multiboot2::BootInformation;
+use x86_64::PhysAddr;
+use x86_64::registers::control::Cr3;
+use x86_64::structures::paging::PhysFrame;
 use utils::multiboot::get_multiboot_info_start_end;
 
 pub mod entry;
@@ -123,7 +125,7 @@ impl ActivePageTable {
         F: FnOnce(&mut Mapper),
     {
         {
-            let backup = Frame::containing_address(crate::arch::commands::read_cr3().0 .0);
+            let backup = Frame::containing_address(Cr3::read().0.start_address().as_u64() as usize);
 
             let p4_table = temporary_page.map_table_frame(backup.clone(), self);
 
@@ -131,26 +133,26 @@ impl ActivePageTable {
                 table.p4_frame.clone(),
                 EntryFlags::PRESENT | EntryFlags::WRITABLE,
             );
-            crate::arch::commands::tlb_flush_all();
+            x86_64::instructions::tlb::flush_all();
 
             f(self);
 
             p4_table[511].set(backup, EntryFlags::PRESENT | EntryFlags::WRITABLE);
-            crate::arch::commands::tlb_flush_all();
+            x86_64::instructions::tlb::flush_all();
         }
 
         temporary_page.unmap(self);
     }
 
     pub fn switch(&mut self, new_table: &mut InactivePageTable) -> InactivePageTable {
-        let old_vals = crate::arch::commands::read_cr3();
+        let old_vals = Cr3::read();
         let old_table = InactivePageTable {
-            p4_frame: Frame::containing_address(old_vals.0 .0 as usize),
+            p4_frame: Frame::containing_address(old_vals.0.start_address().as_u64() as usize),
         };
 
         unsafe {
-            crate::arch::commands::write_cr3(
-                PhysAddr(new_table.p4_frame.start_address()),
+            Cr3::write(
+                PhysFrame::containing_address(PhysAddr::new(new_table.p4_frame.start_address() as u64)),
                 old_vals.1,
             );
         }
