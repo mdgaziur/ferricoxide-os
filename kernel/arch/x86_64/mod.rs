@@ -3,7 +3,6 @@ use crate::arch::mm::{display_heap_stats, HEAP_ALLOCATOR, HEAP_SIZE, HEAP_START}
 
 pub mod utils;
 pub mod mm;
-pub mod process;
 pub mod cpu;
 pub mod interrupts;
 
