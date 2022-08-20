@@ -34,7 +34,7 @@ pub extern "C" fn kernel_main(multiboot_info_addr: usize) -> ! {
     VGADrawer::init(&multiboot_info);
     info!("Initialized VGA drawer");
 
-    VGA_DRAWER.lock().unwrap_ref_mut().buffer.clear();
+    VGA_DRAWER.lock().buffer.clear();
     info!("Cleared VGA drawer");
 
     TextWriter::init(&multiboot_info);

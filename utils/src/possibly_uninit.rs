@@ -1,3 +1,5 @@
+use core::ops::{Deref, DerefMut};
+
 #[derive(Debug, Eq, PartialEq)]
 pub enum PossiblyUninit<T> {
     Init(T),
@@ -32,5 +34,19 @@ impl<T> PossiblyUninit<T> {
 
     pub fn is_uninit(&self) -> bool {
         matches!(self, Self::Uninit)
+    }
+}
+
+impl<T> Deref for PossiblyUninit<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        self.unwrap_ref()
+    }
+}
+
+impl<T> DerefMut for PossiblyUninit<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.unwrap_ref_mut()
     }
 }

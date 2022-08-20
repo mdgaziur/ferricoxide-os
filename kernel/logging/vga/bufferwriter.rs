@@ -62,7 +62,7 @@ impl Buffer {
 
     fn draw_bitmap(&self, bitmap: &[u8; 8], col: usize, row: usize) {
         let mut drawer_binding = VGA_DRAWER.lock();
-        let drawer = &mut drawer_binding.unwrap_ref_mut().buffer;
+        let drawer = &mut drawer_binding.buffer;
 
         let mut y_pos = row * 8;
         for scanline in bitmap {
