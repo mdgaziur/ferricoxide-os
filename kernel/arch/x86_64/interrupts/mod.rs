@@ -16,6 +16,7 @@ use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame, Pag
 use x86_64::structures::tss::TaskStateSegment;
 use x86_64::VirtAddr;
 use crate::arch::cpu::CPU;
+use crate::arch::mm::paging::entry::EntryFlags;
 
 static TSS: Once<TaskStateSegment> = Once::new();
 static GDT: Once<Gdt> = Once::new();
@@ -68,7 +69,7 @@ static DOUBLE_FAULT_IST_INDEX: usize = 0;
 
 pub fn init_interrupts(memory_controller: &mut MemoryController) {
     let double_fault_stack = memory_controller
-        .alloc_stack(10)
+        .alloc_stack(10, EntryFlags::empty())
         .expect("could not allocate stack for double fault stack");
     info!("Initialized double fault stack");
 

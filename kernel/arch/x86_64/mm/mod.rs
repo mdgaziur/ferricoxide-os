@@ -9,7 +9,7 @@ use utils::multiboot::get_kernel_start_end;
 
 pub mod area_frame_allocator;
 pub mod paging;
-mod stack_allocator;
+pub mod stack_allocator;
 
 pub const HEAP_START: usize = 0o_000_001_000_000_0000;
 pub const HEAP_SIZE: usize = 100 * 1024 * 1024; // 100 MiB
@@ -36,11 +36,12 @@ pub struct MemoryController<'a> {
 }
 
 impl<'a> MemoryController<'a> {
-    pub fn alloc_stack(&mut self, size_in_pages: usize) -> Option<Stack> {
+    pub fn alloc_stack(&mut self, size_in_pages: usize, flags: EntryFlags) -> Option<Stack> {
         self.stack_allocator.alloc_stack(
             &mut self.active_table,
             &mut self.frame_allocator,
             size_in_pages,
+            flags,
         )
     }
 }
