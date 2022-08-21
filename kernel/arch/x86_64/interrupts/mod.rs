@@ -109,7 +109,7 @@ pub fn init_interrupts(memory_controller: &mut MemoryController) {
     unsafe { PICS.lock().initialize() }
     info!("Initialized PIC");
 
-    x86_64::instructions::interrupts::enable();
+    CPU::enable_interrupts();
     info!("Enabled interrupts");
 }
 
