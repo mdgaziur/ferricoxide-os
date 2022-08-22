@@ -1,8 +1,14 @@
 arch ?= x86_64
+profile ?= dev
+profile_dir = release
+ifeq ($(profile), dev)
+	profile_dir = debug
+endif
+
 kernel := build/ferricoxide_os-$(arch).bin
 iso := build/ferricoxide_os-$(arch).iso
 target := ferricoxide_os-$(arch)
-rust_kernel := target/$(target)/release/libkernel.a
+rust_kernel := target/$(target)/$(profile_dir)/libkernel.a
 
 linker_script := arch/$(arch)/linker.ld
 grub_cfg := arch/$(arch)/grub/grub.cfg
@@ -36,7 +42,7 @@ $(kernel): kernel $(assembly_object_files) $(linker_script)
 	@ld -n --gc-sections -T $(linker_script) -o $(kernel) $(assembly_object_files) $(rust_kernel)
 
 kernel:
-	@RUST_TARGET_PATH=$(shell pwd) cargo build --target arch/$(arch)/$(target).json --release
+	@RUST_TARGET_PATH=$(shell pwd) cargo build --target arch/$(arch)/$(target).json --profile $(profile)
 
 build/arch/$(arch)/%.o: arch/$(arch)/%.asm
 	@mkdir -p $(shell dirname $@)

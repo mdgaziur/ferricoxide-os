@@ -2,6 +2,7 @@
 members = ["kernel", "utils"]
 
 [profile.dev]
+opt-level = 1
 panic = "abort"
 
 [profile.release]
