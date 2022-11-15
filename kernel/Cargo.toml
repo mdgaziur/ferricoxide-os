@@ -5,7 +5,7 @@ authors = ["MD Gaziur Rahman Noor <mdgaziurrahmannoor@gmail.com>"]
 edition = "2021"
 
 [lib]
-path = "lib.rs"
+path = "kernel.rs"
 crate-type = ["staticlib"]
 
 [dependencies]
