@@ -2,6 +2,8 @@
 mod bufferwriter;
 mod textmodewriter;
 
+use crate::arch::cpu::CPU;
+use crate::kutils::possibly_uninit::PossiblyUninit;
 use crate::logging::vga::bufferwriter::BufferWriter;
 use crate::logging::vga::textmodewriter::TextModeWriter;
 use crate::VGA_DRAWER;
@@ -9,8 +11,6 @@ use core::fmt::Write;
 use lazy_static::lazy_static;
 use multiboot2::{BootInformation, FramebufferType};
 use spin::Mutex;
-use utils::possibly_uninit::PossiblyUninit;
-use crate::arch::cpu::CPU;
 
 lazy_static! {
     pub static ref WRITER: Mutex<TextWriter> = Mutex::new(TextWriter::uninit());

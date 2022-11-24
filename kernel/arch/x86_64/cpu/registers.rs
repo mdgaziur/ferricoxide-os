@@ -78,16 +78,40 @@ impl Registers {
             r12,
             r13,
             r14,
-            r15
+            r15,
         }
     }
 
     pub fn dump_regs(&self) {
         info!("Registers");
         print_raw!("Instruction pointer=0x{:x}\n", self.rip);
-        print_raw!("rax=0x{:x}, rbx=0x{:x}, rcx=0x{:x}, rdx=0x{:x},\n", self.rax, self.rbx, self.rcx, self.rdx);
-        print_raw!("rsi=0x{:x}, rdi=0x{:x}, rbp=0x{:x}, rsp=0x{:x},\n", self.rsi, self.rdi, self.rbp, self.rsp);
-        print_raw!("r8=0x{:x}, r9=0x{:x}, r10=0x{:x}, r11=0x{:x},\n", self.r8, self.r9, self.r10, self.r11);
-        print_raw!("r12=0x{:x}, r13=0x{:x}, r14=0x{:x}, r15=0x{:x}\n", self.r12, self.r13, self.r14, self.r15);
+        print_raw!(
+            "rax=0x{:x}, rbx=0x{:x}, rcx=0x{:x}, rdx=0x{:x},\n",
+            self.rax,
+            self.rbx,
+            self.rcx,
+            self.rdx
+        );
+        print_raw!(
+            "rsi=0x{:x}, rdi=0x{:x}, rbp=0x{:x}, rsp=0x{:x},\n",
+            self.rsi,
+            self.rdi,
+            self.rbp,
+            self.rsp
+        );
+        print_raw!(
+            "r8=0x{:x}, r9=0x{:x}, r10=0x{:x}, r11=0x{:x},\n",
+            self.r8,
+            self.r9,
+            self.r10,
+            self.r11
+        );
+        print_raw!(
+            "r12=0x{:x}, r13=0x{:x}, r14=0x{:x}, r15=0x{:x}\n",
+            self.r12,
+            self.r13,
+            self.r14,
+            self.r15
+        );
     }
 }

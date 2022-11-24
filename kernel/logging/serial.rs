@@ -1,7 +1,7 @@
+use crate::arch::cpu::CPU;
 use lazy_static::lazy_static;
 use spin::Mutex;
 use uart_16550::SerialPort;
-use crate::arch::cpu::CPU;
 
 lazy_static! {
     pub static ref QEMU_SERIAL: Mutex<SerialPort> = {

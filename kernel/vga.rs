@@ -1,8 +1,8 @@
+use crate::kutils::possibly_uninit::PossiblyUninit;
 use alloc::vec;
 use alloc::vec::Vec;
 use multiboot2::{BootInformation, FramebufferType};
 use spin::Mutex;
-use utils::possibly_uninit::PossiblyUninit;
 
 pub static VGA_DRAWER: Mutex<PossiblyUninit<VGADrawer>> = Mutex::new(PossiblyUninit::Uninit);
 

@@ -1,5 +1,5 @@
-use core::panic::PanicInfo;
 use crate::arch::cpu::CPU;
+use core::panic::PanicInfo;
 
 #[panic_handler]
 pub fn panic_handler(panic_info: &PanicInfo) -> ! {

@@ -1,7 +1,7 @@
 pub mod registers;
 
-use core::arch::asm;
 use crate::arch::cpu::registers::Registers;
+use core::arch::asm;
 
 pub struct CPU;
 
@@ -19,7 +19,9 @@ impl CPU {
     }
 
     pub fn without_interrupts<F>(f: F)
-        where F: Fn() {
+    where
+        F: Fn(),
+    {
         x86_64::instructions::interrupts::without_interrupts(f);
     }
 

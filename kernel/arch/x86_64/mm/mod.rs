@@ -2,10 +2,10 @@ use crate::arch::x86_64::mm::area_frame_allocator::AreaFrameAllocator;
 use crate::arch::x86_64::mm::paging::entry::EntryFlags;
 use crate::arch::x86_64::mm::paging::{Page, PhysicalAddress};
 use crate::arch::x86_64::mm::stack_allocator::{Stack, StackAllocator};
+use crate::kutils::multiboot::get_kernel_start_end;
 use linked_list_allocator::LockedHeap;
 use multiboot2::BootInformation;
 use once::assert_has_not_been_called;
-use utils::multiboot::get_kernel_start_end;
 
 pub mod area_frame_allocator;
 pub mod paging;

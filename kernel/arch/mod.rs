@@ -1,6 +1,6 @@
-use multiboot2::BootInformation;
 use crate::arch::mm::MemoryController;
 use crate::arch::x86_64::initial_setup_x86_64;
+use multiboot2::BootInformation;
 
 #[cfg(target_arch = "x86_64")]
 pub mod x86_64;

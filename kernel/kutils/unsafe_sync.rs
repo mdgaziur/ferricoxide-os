@@ -24,7 +24,7 @@ impl<T> UnsafeSync<T> {
 
 impl<T> Deref for UnsafeSync<T> {
     type Target = T;
-    
+
     fn deref(&self) -> &Self::Target {
         &self.inner
     }

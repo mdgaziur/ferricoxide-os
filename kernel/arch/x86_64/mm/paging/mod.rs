@@ -4,13 +4,13 @@ use crate::arch::x86_64::mm::paging::temporary_page::TemporaryPage;
 use crate::arch::x86_64::mm::FrameAllocator;
 use crate::arch::x86_64::mm::{Frame, PAGE_SIZE};
 
+use crate::kutils::multiboot::get_multiboot_info_start_end;
 use core::ops::{Add, Deref, DerefMut};
 pub use entry::*;
 use multiboot2::BootInformation;
-use x86_64::PhysAddr;
 use x86_64::registers::control::Cr3;
 use x86_64::structures::paging::PhysFrame;
-use utils::multiboot::get_multiboot_info_start_end;
+use x86_64::PhysAddr;
 
 pub mod entry;
 mod mapper;
@@ -152,7 +152,9 @@ impl ActivePageTable {
 
         unsafe {
             Cr3::write(
-                PhysFrame::containing_address(PhysAddr::new(new_table.p4_frame.start_address() as u64)),
+                PhysFrame::containing_address(PhysAddr::new(
+                    new_table.p4_frame.start_address() as u64
+                )),
                 old_vals.1,
             );
         }

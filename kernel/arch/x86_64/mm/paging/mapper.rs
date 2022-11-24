@@ -1,9 +1,9 @@
-use x86_64::VirtAddr;
 use crate::arch::x86_64::mm::paging::entry::EntryFlags;
 use crate::arch::x86_64::mm::paging::table::{Level4, Table, P4};
 use crate::arch::x86_64::mm::paging::{Page, PhysicalAddress, VirtualAddress, ENTRY_COUNT};
 use crate::arch::x86_64::mm::FrameAllocator;
 use crate::arch::x86_64::mm::{Frame, PAGE_SIZE};
+use x86_64::VirtAddr;
 
 pub struct Mapper {
     p4: &'static mut Table<Level4>,
