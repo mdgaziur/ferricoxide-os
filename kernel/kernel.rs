@@ -1,6 +1,7 @@
 #![feature(panic_info_message)]
 #![feature(default_alloc_error_handler)]
 #![feature(abi_x86_interrupt)]
+#![feature(prelude_import)]
 #![no_std]
 
 extern crate alloc;
@@ -25,6 +26,10 @@ mod kutils;
 mod panicking;
 mod task;
 mod vga;
+mod kprelude;
+
+#[prelude_import]
+use kprelude::*;
 
 #[allow(unused)]
 static NAME: &str = "FerricOxide OS";

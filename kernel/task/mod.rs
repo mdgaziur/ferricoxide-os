@@ -1,7 +1,6 @@
 pub mod executor;
 pub mod keyboard;
 
-use alloc::boxed::Box;
 use core::future::Future;
 use core::pin::Pin;
 use core::sync::atomic::{AtomicU64, Ordering};

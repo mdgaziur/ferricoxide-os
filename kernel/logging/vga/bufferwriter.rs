@@ -1,6 +1,4 @@
 use crate::vga::{Pixel, VGA_DRAWER};
-use alloc::vec;
-use alloc::vec::Vec;
 use core::fmt::Write;
 use font8x8::{UnicodeFonts, BASIC_FONTS};
 
