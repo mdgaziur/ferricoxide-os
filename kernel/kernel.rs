@@ -48,7 +48,9 @@ pub extern "C" fn kmain(multiboot_info_addr: usize) -> ! {
     VGADrawer::init(BOOT_INFO.try_get().unwrap());
     info!("Initialized VGA drawer");
 
-    VGA_DRAWER.lock().buffer.clear();
+    if VGA_DRAWER.lock().is_init() {
+        VGA_DRAWER.lock().buffer.clear();
+    }
     info!("Cleared VGA drawer");
 
     TextWriter::init(BOOT_INFO.try_get().unwrap());
