@@ -23,19 +23,3 @@ pub fn enable_write_protect_bit() {
         asm!("mov cr0, {}", in(reg) value | write_protect_bit, options(nostack, preserves_flags));
     }
 }
-
-pub unsafe fn outb(port: u16, val: u8) {
-    unsafe {
-        asm!("out dx, al", in("dx") port, in("al") val, options(nomem, nostack, preserves_flags))
-    }
-}
-
-pub unsafe fn inb(port: u16) -> u8 {
-    let read;
-
-    unsafe {
-        asm!("in al, dx", out("al") read, in("dx") port, options(nomem, nostack, preserves_flags))
-    }
-
-    read
-}
