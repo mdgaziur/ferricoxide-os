@@ -1,3 +1,7 @@
+use core::ops::Neg;
+
+#[allow(unused)]
+#[derive(Debug)]
 #[repr(u8)]
 pub enum ErrorCode {
     /// Operation not permitted
