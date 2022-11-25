@@ -96,7 +96,10 @@ pub extern "C" fn kmain(multiboot_info_addr: usize) -> ! {
             }
         }
     }
-    info!("File size: {}", VFS.lock().fsize(Path::new("/file-0.txt")).unwrap());
+    info!(
+        "File size: {}",
+        VFS.lock().fsize(Path::new("/file-0.txt")).unwrap()
+    );
     let file = VFS.lock().open(Path::new("/file-0.txt")).unwrap();
     info!(
         "Increased {} bytes in size",

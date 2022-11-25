@@ -26,7 +26,7 @@ def get_arch() -> bool:
 
 def get_boot_assemblies():
     assemblies_dir = f"./kernel/arch/{ferricoxide_architecture}/boot/"
-    
+
     for file in os.listdir(assemblies_dir):
         filename = os.fsdecode(file)
         if filename.endswith('.s'):
@@ -48,7 +48,7 @@ def compile_kernel() -> bool:
     command = "cargo build"
     if "--release" in sys.argv:
         command += " --release"
-    
+
     os.chdir("kernel")
     print("Compiling kernel...")
     process = None
@@ -94,13 +94,36 @@ def boot():
     command = f"qemu-system-{ferricoxide_architecture} -cdrom build/{ferricoxide_architecture}/{ferricoxide_architecture}-ferricoxide_os.iso -d cpu_reset -serial stdio -no-reboot -no-shutdown -s"
     subprocess.run(shlex.split(command))
 
+def format_kernel_code():
+    command = "cargo fmt"
+    os.chdir("kernel")
+    subprocess.run(shlex.split(command))
+    os.chdir("..")
+
+def fix_kernel_code():
+    command = "cargo clippy --fix --allow-dirty --allow-staged --lib -p kernel"
+    os.chdir("kernel")
+    subprocess.run(shlex.split(command))
+    os.chdir("..")
+
+    command = "cargo fix --allow-dirty --allow-staged --lib -p kernel"
+    os.chdir("kernel")
+    subprocess.run(shlex.split(command))
+    os.chdir("..")
+
 def main():
+    if "format" in sys.argv:
+        format_kernel_code()
+        return
+    if "fix" in sys.argv:
+        fix_kernel_code()
+
     if not get_arch():
         return
-    
+
     if os.path.isdir("build"):
         shutil.rmtree(f"build/{ferricoxide_architecture}")
-    
+
     os.makedirs(f"build/{ferricoxide_architecture}/objects")
 
     get_boot_assemblies()
@@ -109,7 +132,7 @@ def main():
         return
     link_everything()
     make_iso()
-    
+
     if "run" in sys.argv:
         boot()
 
