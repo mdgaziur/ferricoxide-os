@@ -19,12 +19,8 @@ impl RamFS {
         }
     }
 
-    fn resolve(
-        path: Path,
-        full_path: Path,
-        node: &mut RamFSNode,
-    ) -> Result<&mut RamFSNode, ErrorCode> {
-        if path.segments().len() == 0 {
+    fn resolve(path: Path, node: &mut RamFSNode) -> Result<&mut RamFSNode, ErrorCode> {
+        if path.segments().is_empty() {
             Ok(node)
         } else if path.segments().len() == 1 {
             match node {
@@ -42,7 +38,7 @@ impl RamFS {
                 RamFSNode::File(_) => Err(ErrorCode::ENOENT),
                 RamFSNode::Dir(d) => {
                     if let Some(entry) = d.children.get_mut(path.segments().first().unwrap()) {
-                        Self::resolve(path.path_from_idx(1), full_path, entry)
+                        Self::resolve(path.path_from_idx(1), entry)
                     } else {
                         Err(ErrorCode::ENOENT)
                     }
@@ -57,7 +53,7 @@ impl RamFS {
         node: &mut RamFSNode,
         arc_ref: Arc<Mutex<Box<dyn Filesystem>>>,
     ) -> IOResult {
-        let entry = Self::resolve(path, full_path.clone(), node)?;
+        let entry = Self::resolve(path, node)?;
 
         Ok(FSNode {
             name: entry.name(),
@@ -90,8 +86,8 @@ impl Filesystem for RamFS {
                 path.path_from_range(0, path.segments().len() - 2)
             }
         };
-        let result = Self::resolve(dir_path.clone(), dir_path.clone(), &mut self.root)?;
-        let mut dir = match result {
+        let result = Self::resolve(dir_path, &mut self.root)?;
+        let dir = match result {
             RamFSNode::Dir(dir) => dir,
             RamFSNode::File(_) => return Err(ErrorCode::ENOENT),
         };
@@ -119,8 +115,8 @@ impl Filesystem for RamFS {
                 path.path_from_range(0, path.segments().len() - 2)
             }
         };
-        let result = Self::resolve(dir_path.clone(), dir_path.clone(), &mut self.root)?;
-        let mut dir = match result {
+        let result = Self::resolve(dir_path, &mut self.root)?;
+        let dir = match result {
             RamFSNode::Dir(dir) => dir,
             RamFSNode::File(_) => return Err(ErrorCode::ENOENT),
         };
@@ -145,8 +141,8 @@ impl Filesystem for RamFS {
         path: Path,
         arc_ref: Arc<Mutex<Box<dyn Filesystem>>>,
     ) -> Result<Vec<FSNode>, ErrorCode> {
-        let result = Self::resolve(path.clone(), path.clone(), &mut self.root)?;
-        let mut dir = match result {
+        let result = Self::resolve(path.clone(), &mut self.root)?;
+        let dir = match result {
             RamFSNode::Dir(dir) => dir,
             RamFSNode::File(_) => return Err(ErrorCode::ENOENT),
         };
@@ -171,30 +167,26 @@ impl Filesystem for RamFS {
         start: usize,
         end: usize,
     ) -> Result<usize, ErrorCode> {
-        if bytes.len() == 0 {
+        if bytes.is_empty() {
             return Ok(0);
         }
-        let file = Self::resolve(node.path.clone(), node.path.clone(), &mut self.root)?;
+        let file = Self::resolve(node.path.clone(), &mut self.root)?;
         let f = match file {
             RamFSNode::Dir(_) => return Err(ErrorCode::EISDIR),
             RamFSNode::File(f) => f,
         };
-        let bytes_increased = (end + 1).checked_sub(f.content.len()).unwrap_or(0);
+        let bytes_increased = (end + 1).saturating_sub(f.content.len());
         for _ in 0..bytes_increased {
             f.content.push(0);
         }
 
-        let mut b_idx = 0;
-        for i in start..end + 1 {
-            f.content[i] = bytes[b_idx];
-            b_idx += 1;
-        }
+        f.content[start..(end + 1)].copy_from_slice(&bytes[..(end + 1 - start)]);
 
         Ok(bytes_increased)
     }
 
     fn read(&mut self, node: &FSNode, start: usize, end: usize) -> Result<Vec<u8>, ErrorCode> {
-        let file = Self::resolve(node.path.clone(), node.path.clone(), &mut self.root)?;
+        let file = Self::resolve(node.path.clone(), &mut self.root)?;
         let f = match file {
             RamFSNode::Dir(_) => return Err(ErrorCode::EISDIR),
             RamFSNode::File(f) => f,
@@ -208,7 +200,7 @@ impl Filesystem for RamFS {
     }
 
     fn fsize(&mut self, path: Path) -> Result<usize, ErrorCode> {
-        let file = Self::resolve(path.clone(), path.clone(), &mut self.root)?;
+        let file = Self::resolve(path, &mut self.root)?;
         match file {
             RamFSNode::Dir(_) => Err(ErrorCode::EISDIR),
             RamFSNode::File(f) => Ok(f.content.len()),

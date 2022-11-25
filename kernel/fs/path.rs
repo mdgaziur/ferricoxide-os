@@ -13,13 +13,14 @@ pub struct Path {
     segments: Vec<String>,
 }
 
+#[allow(unused)]
 impl Path {
     pub fn new(path: &str) -> Self {
         let segments = path
-            .split("/")
+            .split('/')
             .filter(|segment| *segment != ".") // '.' is kinda "no op" so we ignore them
-            .filter(|segment| *segment != "") // Hack to remove empty strings when path is split
-            .map(|segment| String::from(segment))
+            .filter(|segment| !segment.is_empty()) // Hack to remove empty strings when path is split
+            .map(String::from)
             .collect::<Vec<_>>();
         assert_ne!(segments.first(), Some(&String::from("..")));
         let segments = Self::canonicalize(segments);
@@ -28,7 +29,7 @@ impl Path {
     }
 
     /// Takes path segments and makes the path canonical
-    fn canonicalize(mut segments: Vec<String>) -> Vec<String> {
+    fn canonicalize(segments: Vec<String>) -> Vec<String> {
         // We are at the root
         if segments.is_empty() {
             return segments;

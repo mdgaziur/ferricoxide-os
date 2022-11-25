@@ -3,7 +3,7 @@ mod gdt;
 use gdt::Gdt;
 use lazy_static::lazy_static;
 
-use crate::arch::cpu::CPU;
+use crate::arch::cpu::Cpu;
 use crate::arch::mm::paging::entry::EntryFlags;
 use crate::arch::x86_64::mm::MemoryController;
 use pic8259::ChainedPics;
@@ -87,7 +87,7 @@ pub fn init_interrupts(memory_controller: &mut MemoryController) {
     let gdt = GDT.call_once(|| {
         let mut gdt = Gdt::new();
         code_selector = gdt.add_entry(Gdt::kernel_code_segment());
-        tss_selector = gdt.add_entry(Gdt::tss_segment(&tss));
+        tss_selector = gdt.add_entry(Gdt::tss_segment(tss));
 
         gdt
     });
@@ -110,7 +110,7 @@ pub fn init_interrupts(memory_controller: &mut MemoryController) {
     unsafe { PICS.lock().initialize() }
     info!("Initialized PIC");
 
-    CPU::enable_interrupts();
+    Cpu::enable_interrupts();
     info!("Enabled interrupts");
 }
 
@@ -128,10 +128,9 @@ extern "x86-interrupt" fn double_fault_handler(
     info!("Error code: {}", error_code);
 
     info!("Halting CPU!");
-    hlt();
-
-    // to tell rust that this is diverging function
-    loop {}
+    loop {
+        hlt();
+    }
 }
 
 extern "x86-interrupt" fn timer_interrupt_handler(_: InterruptStackFrame) {
@@ -150,7 +149,7 @@ extern "x86-interrupt" fn page_fault_handler(
         stack_frame, error_code
     );
     // TODO: handle page fault from userland applications(in future)
-    CPU::halt();
+    Cpu::halt();
 }
 
 extern "x86-interrupt" fn keyboard_interrupt_handler(_: InterruptStackFrame) {

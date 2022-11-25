@@ -5,13 +5,13 @@ use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use spin::Mutex;
 
-pub static VFS: Mutex<VFS> = Mutex::new(VFS::new());
+pub static VFS: Mutex<Vfs> = Mutex::new(Vfs::new());
 
-pub struct VFS {
+pub struct Vfs {
     mounts: BTreeMap<Path, Arc<Mutex<Box<dyn Filesystem>>>>,
 }
 
-impl VFS {
+impl Vfs {
     pub const fn new() -> Self {
         Self {
             mounts: BTreeMap::new(),
@@ -24,6 +24,7 @@ impl VFS {
         }
     }
 
+    #[allow(clippy::type_complexity)]
     fn resolve_mountpoint(
         &mut self,
         path: Path,
@@ -95,6 +96,6 @@ impl VFS {
     pub fn fsize(&mut self, path: Path) -> Result<usize, ErrorCode> {
         let (mountpoint, path_in_mountpoint) = self.resolve_mountpoint(path)?;
         let mut mountpoint_locked = mountpoint.lock();
-        Ok(mountpoint_locked.fsize(path_in_mountpoint)?)
+        mountpoint_locked.fsize(path_in_mountpoint)
     }
 }

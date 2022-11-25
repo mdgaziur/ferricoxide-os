@@ -30,7 +30,7 @@ pub struct Page {
 impl Page {
     pub fn containing_address(address: VirtualAddress) -> Page {
         assert!(
-            address < 0x0000_8000_0000_0000 || address >= 0xffff_8000_0000_0000,
+            !(0x0000_8000_0000_0000..0xffff_8000_0000_0000).contains(&address),
             "invalid address: 0x{:x}",
             address
         );
@@ -54,7 +54,7 @@ impl Page {
         (self.number >> 9) & 0o777
     }
     fn p1_index(&self) -> usize {
-        (self.number >> 0) & 0o777
+        self.number & 0o777
     }
 
     pub fn range_inclusive(start: Page, end: Page) -> PageIter {
@@ -225,7 +225,7 @@ where
 
         let vga_framebuffer_tag = boot_info.framebuffer_tag().unwrap();
         let vga_framebuffer_end = (vga_framebuffer_tag.address
-            + (vga_framebuffer_tag.height * vga_framebuffer_tag.pitch as u32) as u64)
+            + (vga_framebuffer_tag.height * vga_framebuffer_tag.pitch) as u64)
             as usize;
         info!(
             "{:?}",
@@ -241,7 +241,7 @@ where
             mapper.identity_map(frame, EntryFlags::WRITABLE, allocator);
         }
 
-        let (multiboot_start, multiboot_end) = get_multiboot_info_start_end(&boot_info);
+        let (multiboot_start, multiboot_end) = get_multiboot_info_start_end(boot_info);
         for frame in Frame::range_inclusive(
             Frame::containing_address(multiboot_start),
             Frame::containing_address(multiboot_end),

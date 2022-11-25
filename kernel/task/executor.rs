@@ -1,4 +1,4 @@
-use crate::arch::cpu::CPU;
+use crate::arch::cpu::Cpu;
 use crate::task::{Task, TaskId};
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
@@ -13,7 +13,7 @@ pub struct Executor {
 }
 
 impl Executor {
-    pub fn new() -> Executor {
+    pub fn new() -> Self {
         Executor {
             tasks: BTreeMap::new(),
             task_queue: Arc::new(ArrayQueue::new(100)),
@@ -39,7 +39,7 @@ impl Executor {
             let waker = self
                 .waker_cache
                 .entry(task_id)
-                .or_insert_with(|| TaskWaker::new(task_id, self.task_queue.clone()));
+                .or_insert_with(|| TaskWaker::create_waker(task_id, self.task_queue.clone()));
 
             let mut context = Context::from_waker(waker);
             match task.poll(&mut context) {
@@ -60,11 +60,11 @@ impl Executor {
     }
 
     fn sleep_if_idle(&self) {
-        CPU::disable_interrupts();
+        Cpu::disable_interrupts();
         if self.task_queue.is_empty() {
-            CPU::enable_interrupts_and_halt();
+            Cpu::enable_interrupts_and_halt();
         } else {
-            CPU::disable_interrupts();
+            Cpu::disable_interrupts();
         }
     }
 }
@@ -75,7 +75,7 @@ struct TaskWaker {
 }
 
 impl TaskWaker {
-    fn new(task_id: TaskId, task_queue: Arc<ArrayQueue<TaskId>>) -> Waker {
+    fn create_waker(task_id: TaskId, task_queue: Arc<ArrayQueue<TaskId>>) -> Waker {
         Waker::from(Arc::new(Self {
             task_id,
             task_queue,

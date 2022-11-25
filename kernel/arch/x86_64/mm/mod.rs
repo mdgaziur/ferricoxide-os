@@ -11,7 +11,7 @@ pub mod area_frame_allocator;
 pub mod paging;
 pub mod stack_allocator;
 
-pub const HEAP_START: usize = 0o_000_001_000_000_0000;
+pub const HEAP_START: usize = 0o0_000_010_000_000_000;
 pub const HEAP_SIZE: usize = 100 * 1024 * 1024; // 100 MiB
 #[allow(non_upper_case_globals)]
 pub const MiB: usize = 1024 * 1024;
@@ -55,9 +55,9 @@ pub const PAGE_SIZE: usize = 4096;
 
 impl Frame {
     fn containing_address(address: usize) -> Self {
-        return Self {
+        Self {
             number: address / PAGE_SIZE,
-        };
+        }
     }
 
     fn range_inclusive(start: Frame, end: Frame) -> FrameIter {
@@ -99,7 +99,7 @@ pub fn init(boot_info: &BootInformation) -> MemoryController {
     assert_has_not_been_called!();
 
     let memory_map_tag = boot_info.memory_map_tag().expect("Memory map tag required");
-    let (kernel_start, kernel_end) = get_kernel_start_end(&boot_info);
+    let (kernel_start, kernel_end) = get_kernel_start_end(boot_info);
 
     info!(
         "kernel start: {:#x}, kernel end: {:#x}",
@@ -112,11 +112,11 @@ pub fn init(boot_info: &BootInformation) -> MemoryController {
     );
 
     let mut frame_allocator = AreaFrameAllocator::new(
-        kernel_start as usize,
-        kernel_end as usize,
+        kernel_start,
+        kernel_end,
         boot_info.start_address(),
         boot_info.end_address(),
-        &memory_map_tag,
+        memory_map_tag,
     );
 
     let mut active_table = paging::remap_the_kernel(&mut frame_allocator, boot_info);

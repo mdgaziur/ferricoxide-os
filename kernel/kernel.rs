@@ -2,6 +2,7 @@
 #![feature(default_alloc_error_handler)]
 #![feature(abi_x86_interrupt)]
 #![feature(prelude_import)]
+#![feature(stmt_expr_attributes)]
 #![no_std]
 
 extern crate alloc;
@@ -36,6 +37,7 @@ use crate::fs::ramfs::RamFS;
 use crate::fs::vfs::VFS;
 use crate::fs::FSNodeType;
 #[prelude_import]
+#[allow(unused)]
 use kprelude::*;
 
 #[allow(unused)]

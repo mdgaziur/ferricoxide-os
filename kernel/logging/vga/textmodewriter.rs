@@ -80,7 +80,7 @@ impl TextModeWriter {
         for ch in s.chars() {
             let ch = ch as u8;
 
-            match ch as u8 {
+            match ch {
                 b'\n' => self.new_line(),
                 0x20..=0x7e => self.write_byte(ch),
                 _ => self.write_byte(0xfe),

@@ -3,9 +3,9 @@ pub mod registers;
 use crate::arch::cpu::registers::Registers;
 use core::arch::asm;
 
-pub struct CPU;
+pub struct Cpu;
 
-impl CPU {
+impl Cpu {
     pub fn enable_interrupts_and_halt() {
         x86_64::instructions::interrupts::enable_and_hlt();
     }

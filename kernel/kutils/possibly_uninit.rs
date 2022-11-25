@@ -6,6 +6,7 @@ pub enum PossiblyUninit<T> {
     Uninit,
 }
 
+#[allow(unused)]
 impl<T> PossiblyUninit<T> {
     pub fn unwrap_ref(&self) -> &T {
         match self {

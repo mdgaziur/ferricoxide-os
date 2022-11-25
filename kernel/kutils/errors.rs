@@ -1,6 +1,5 @@
-use core::ops::Neg;
-
 #[allow(unused)]
+#[allow(clippy::upper_case_acronyms)]
 #[derive(Debug)]
 #[repr(u8)]
 pub enum ErrorCode {

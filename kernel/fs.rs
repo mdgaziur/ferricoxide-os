@@ -2,7 +2,7 @@ use crate::fs::path::Path;
 use crate::kutils::errors::ErrorCode;
 use alloc::sync::Arc;
 use core::fmt::{Display, Formatter};
-use spin::{Mutex, RwLock};
+use spin::Mutex;
 
 pub mod path;
 pub mod ramfs;
@@ -15,6 +15,7 @@ pub struct FSNode {
     path: Path,
 }
 
+#[allow(unused)]
 impl FSNode {
     pub fn name(&self) -> &str {
         &self.name
@@ -35,6 +36,7 @@ impl Display for FSNode {
     }
 }
 
+#[allow(unused)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum FSNodeType {
     Dir,

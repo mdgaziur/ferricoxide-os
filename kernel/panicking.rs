@@ -1,9 +1,9 @@
-use crate::arch::cpu::CPU;
+use crate::arch::cpu::Cpu;
 use core::panic::PanicInfo;
 
 #[panic_handler]
 pub fn panic_handler(panic_info: &PanicInfo) -> ! {
-    CPU::disable_interrupts();
+    Cpu::disable_interrupts();
     error!("Disabled interrupts");
 
     error!("Kernel panic");
@@ -15,6 +15,6 @@ pub fn panic_handler(panic_info: &PanicInfo) -> ! {
         print_raw!("{}\n", location);
     }
 
-    CPU::dump_registers();
-    CPU::halt();
+    Cpu::dump_registers();
+    Cpu::halt();
 }

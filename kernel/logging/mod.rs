@@ -14,6 +14,7 @@ macro_rules! println {
 #[macro_export]
 macro_rules! print {
     ($prefix_colored:literal, $prefix:literal, $($arg:tt)*) => {
+    #[allow(clippy::redundant_closure_call)]
         (|msg: core::fmt::Arguments| {
             serial_print!("{} {}", $prefix_colored, msg);
             vprint!("{} {}", $prefix, msg);
@@ -24,6 +25,7 @@ macro_rules! print {
 #[macro_export]
 macro_rules! print_raw {
     ($($arg:tt)*) => {
+        #[allow(clippy::redundant_closure_call)]
         (|msg: core::fmt::Arguments| {
             serial_print!("{}", msg);
             vprint!("{}", msg);

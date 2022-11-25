@@ -6,7 +6,7 @@ use crate::arch::x86_64::mm::FrameAllocator;
 use core::marker::PhantomData;
 use core::ops::{Index, IndexMut};
 
-pub const P4: *mut Table<Level4> = 0xffffffff_fffff000 as *mut _;
+pub const P4: *mut Table<Level4> = 0xffff_ffff_ffff_f000 as *mut _;
 
 pub struct Table<L> {
     entries: [Entry; ENTRY_COUNT],

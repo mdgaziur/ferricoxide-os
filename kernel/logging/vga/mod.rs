@@ -2,7 +2,7 @@
 mod bufferwriter;
 mod textmodewriter;
 
-use crate::arch::cpu::CPU;
+use crate::arch::cpu::Cpu;
 use crate::kutils::possibly_uninit::PossiblyUninit;
 use crate::logging::vga::bufferwriter::BufferWriter;
 use crate::logging::vga::textmodewriter::TextModeWriter;
@@ -65,7 +65,7 @@ enum Writer {
 
 #[doc(hidden)]
 pub fn print(args: core::fmt::Arguments) {
-    CPU::without_interrupts(|| {
+    Cpu::without_interrupts(|| {
         WRITER.lock().write_fmt(args).unwrap();
         let mut drawer_binding = VGA_DRAWER.lock();
         if let PossiblyUninit::Init(drawer) = &mut *drawer_binding {

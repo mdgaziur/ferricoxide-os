@@ -1,4 +1,4 @@
-use crate::arch::cpu::CPU;
+use crate::arch::cpu::Cpu;
 use lazy_static::lazy_static;
 use spin::Mutex;
 use uart_16550::SerialPort;
@@ -15,7 +15,7 @@ lazy_static! {
 pub fn print(args: core::fmt::Arguments) {
     use core::fmt::Write;
 
-    CPU::without_interrupts(|| {
+    Cpu::without_interrupts(|| {
         QEMU_SERIAL
             .lock()
             .write_fmt(args)
