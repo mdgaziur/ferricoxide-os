@@ -6,13 +6,13 @@ pub fn panic_handler(panic_info: &PanicInfo) -> ! {
     CPU::disable_interrupts();
     error!("Disabled interrupts");
 
-    error!("Kernel panic: {}", panic_info);
+    error!("Kernel panic");
     if let Some(message) = panic_info.message() {
-        error!("{}", message);
+        print_raw!("{}\n", message);
     }
 
     if let Some(location) = panic_info.location() {
-        error!("Location: {}", location);
+        print_raw!("{}\n", location);
     }
 
     CPU::dump_registers();
