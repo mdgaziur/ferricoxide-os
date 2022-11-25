@@ -117,6 +117,7 @@ def main():
         return
     if "fix" in sys.argv:
         fix_kernel_code()
+        return
 
     if not get_arch():
         return
