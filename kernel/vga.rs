@@ -59,32 +59,6 @@ impl VGAFramebuffer {
         }
     }
 
-    pub fn move_up(&mut self, row_count: usize) {
-        let mut y = row_count;
-        while y < self.height {
-            for m in 0..row_count {
-                for x in 0..self.width {
-                    let current_pixel = self.get_pixel(x, y + m);
-                    let pixel_offset = x * (self.bpp / 8) + (y + m - row_count) * self.pitch;
-                    let pixel_addr =
-                        (self.secondary_buffer.as_ptr() as usize + pixel_offset) as *mut u8;
-
-                    unsafe {
-                        *pixel_addr = current_pixel.r;
-                        *pixel_addr.offset(1) = current_pixel.g;
-                        *pixel_addr.offset(2) = current_pixel.b;
-                    }
-                }
-            }
-
-            y += row_count;
-        }
-
-        for pos_y in self.height - row_count..self.height {
-            self.clear_y(pos_y);
-        }
-    }
-
     fn clear_y(&mut self, pos_y: usize) {
         for pos_x in 0..self.width {
             self.write_pixel(Pixel { r: 0, g: 0, b: 0 }, pos_x, pos_y);
