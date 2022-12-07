@@ -118,7 +118,7 @@ pub extern "C" fn kmain(multiboot_info_addr: usize) -> ! {
         String::from_utf8(VFS.lock().read(&file, 0, 11).unwrap()).unwrap()
     );
     info!(
-        "Replacing `H` with `R` for on reason. Increased {} bytes in size",
+        "Replacing `H` with `R` for no reason. Increased {} bytes in size",
         VFS.lock().write(&file, b"R".to_vec(), 0, 0).unwrap()
     );
     info!(
