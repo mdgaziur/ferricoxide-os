@@ -91,11 +91,8 @@ impl Buffer {
 
             self.cur_row = self.rows - 1;
             self.clear_row(self.cur_row);
-            VGA_DRAWER
-                .lock()
-                .unwrap_ref_mut()
-                .buffer
-                .move_up(FONT_HEIGHT);
+            VGA_DRAWER.lock().buffer.clear();
+            self.commit();
         } else {
             self.cur_row += 1;
         }
