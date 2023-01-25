@@ -6,6 +6,7 @@ use multiboot2::BootInformation;
 pub mod cpu;
 pub mod interrupts;
 pub mod mm;
+pub mod thread;
 pub mod utils;
 
 pub fn initial_setup_x86_64(boot_info: &BootInformation) -> MemoryController {
