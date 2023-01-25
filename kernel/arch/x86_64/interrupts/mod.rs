@@ -6,6 +6,9 @@ use lazy_static::lazy_static;
 use crate::arch::cpu::Cpu;
 use crate::arch::mm::paging::entry::EntryFlags;
 use crate::arch::x86_64::mm::MemoryController;
+use crate::logging::serial::QEMU_SERIAL;
+use crate::logging::vga::WRITER;
+use crate::vga::VGA_DRAWER;
 use pic8259::ChainedPics;
 use spin::{Mutex, Once};
 use x86_64::instructions::hlt;
@@ -33,6 +36,7 @@ lazy_static! {
         idt.breakpoint.set_handler_fn(breakpoint_handler);
 
         idt.page_fault.set_handler_fn(page_fault_handler);
+        idt.invalid_opcode.set_handler_fn(invalid_opcode_handler);
 
         unsafe {
             idt.double_fault
@@ -69,7 +73,7 @@ static DOUBLE_FAULT_IST_INDEX: usize = 0;
 
 pub fn init_interrupts(memory_controller: &mut MemoryController) {
     let double_fault_stack = memory_controller
-        .alloc_stack(20, EntryFlags::empty())
+        .alloc_stack(1, EntryFlags::empty())
         .expect("could not allocate stack for double fault stack");
     info!("Initialized double fault stack");
 
@@ -118,13 +122,26 @@ extern "x86-interrupt" fn breakpoint_handler(stack_frame: InterruptStackFrame) {
     error!("Exception: Breakpoint\n{:#?}", stack_frame);
 }
 
+extern "x86-interrupt" fn invalid_opcode_handler(stack_frame: InterruptStackFrame) {
+    error!("Exception: invalid opcode\n{:#?}", stack_frame);
+
+    // TODO: send SIGILL to userland program when the kernel supports them
+
+    error!("Kernel will not continue!");
+    Cpu::halt();
+}
+
 extern "x86-interrupt" fn double_fault_handler(
     stack_frame: InterruptStackFrame,
     error_code: u64,
 ) -> ! {
+    // Force unlock to prevent deadlocks while displaying error information
+    unsafe {
+        QEMU_SERIAL.force_unlock();
+        WRITER.force_unlock();
+        VGA_DRAWER.force_unlock();
+    }
     error!("Exception: Double fault\n{:#?}", stack_frame);
-
-    // TODO: The following doesn't get executed for some reason sometimes
     info!("Error code: {}", error_code);
 
     info!("Halting CPU!");
@@ -144,6 +161,12 @@ extern "x86-interrupt" fn page_fault_handler(
     stack_frame: InterruptStackFrame,
     error_code: PageFaultErrorCode,
 ) {
+    // Force unlock to prevent deadlocks while displaying error information
+    unsafe {
+        QEMU_SERIAL.force_unlock();
+        WRITER.force_unlock();
+        VGA_DRAWER.force_unlock();
+    }
     error!(
         "Exception: Page fault\n{:#?}\nError code: {:?}",
         stack_frame, error_code
