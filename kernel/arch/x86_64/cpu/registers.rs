@@ -83,7 +83,6 @@ impl Registers {
     }
 
     pub fn dump_regs(&self) {
-        print_raw!("Registers");
         print_raw!("Instruction pointer=0x{:x}\n", self.rip);
         print_raw!(
             "rax=0x{:x}, rbx=0x{:x}, rcx=0x{:x}, rdx=0x{:x},\n",
