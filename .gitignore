@@ -1,0 +1,7 @@
+# Editor files
+.idea
+.vscode
+
+# Build artifacts
+build
+target
