@@ -1,0 +1,19 @@
+[package]
+name = "kernel"
+version = "0.1.0"
+edition = "2021"
+authors = ["MD Gaziur Rahman Noor <mdgaziurrahmannoor@gmail.com>"]
+
+[lib]
+path = "kernel.rs"
+crate-type = ["staticlib"]
+
+[profile.dev]
+opt-level = 2
+panic = "abort"
+
+[dependencies]
+multiboot2 = "0.15.1"
+uart_16550 = "0.2.18"
+lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
+spin = "0.9.8"
