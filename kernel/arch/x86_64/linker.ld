@@ -13,7 +13,7 @@ SECTIONS {
     .text :
     {
         *(.text .text.*)
-        . = ALIGN(4k);
+        . = ALIGN(4K);
     }
 
     .data :
@@ -25,12 +25,6 @@ SECTIONS {
     .bss :
     {
         *(.bss .bss.*)
-        . = ALIGN(4K);
-    }
-
-    .rodata :
-    {
-        *(.rodata .rodata.*)
         . = ALIGN(4K);
     }
 
