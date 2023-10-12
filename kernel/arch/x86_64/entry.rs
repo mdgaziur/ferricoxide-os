@@ -17,6 +17,7 @@
  */
 
 use crate::arch::mm;
+use crate::serial_println;
 
 pub unsafe fn arch_entry(multiboot_info_addr: usize) {
     let boot_info = unsafe { multiboot2::load(multiboot_info_addr) }.unwrap();

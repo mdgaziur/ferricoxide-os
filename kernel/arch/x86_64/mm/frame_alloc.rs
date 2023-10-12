@@ -16,6 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use crate::units::{GiB, KiB};
 use core::mem::align_of;
 use core::ops::Add;
 

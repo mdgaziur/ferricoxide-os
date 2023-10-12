@@ -15,19 +15,16 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 #![no_std]
-#![feature(prelude_import)]
 
 mod arch;
-mod kprelude;
+#[macro_use]
 mod serial;
+mod units;
 
 use crate::arch::entry::arch_entry;
 use core::hint::spin_loop;
 use core::panic::PanicInfo;
-#[prelude_import]
-use kprelude::*;
 
 /// This is the Rust entry point of the kernel. At first it calls the architecture specific entry
 /// function to set up various architecture specific stuff like memory management, interrupt handlers,

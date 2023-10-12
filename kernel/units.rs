@@ -16,18 +16,13 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-pub use core::arch::asm;
-pub use core::prelude::v1::*;
-
-pub use crate::serial_println;
-
-pub const BYTE: usize = 1;
+pub const BYTE: u64 = 1;
 
 #[allow(non_upper_case_globals)]
-pub const KiB: usize = BYTE * 1024;
+pub const KiB: u64 = BYTE * 1024;
 
 #[allow(non_upper_case_globals)]
-pub const MiB: usize = KiB * 1024;
+pub const MiB: u64 = KiB * 1024;
 
 #[allow(non_upper_case_globals)]
-pub const GiB: usize = MiB * 1024;
+pub const GiB: u64 = MiB * 1024;
