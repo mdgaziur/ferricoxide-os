@@ -24,6 +24,7 @@ use core::ops::Add;
 /// frames that can hold given amount of data. This is a thin wrapper around [`FrameAllocBitmap`]
 /// which does most of the heavy lifting for allocating frames.
 pub struct FrameAllocator {
+    base_addr: *mut u8,
     frame_alloc_bitmaps: &'static mut [FrameAllocBitmap; BITMAP_COUNT_FOR_128G as usize],
 }
 
@@ -32,26 +33,49 @@ impl FrameAllocator {
     ///
     /// ## Safety
     ///
-    /// Kernel bottom address must point to the end address of the kernel and the next 2MB(after proper alignment)
-    /// *must* not be used by anything else.
-    pub unsafe fn new(kernel_bottom_addr: *const u8) -> Self {
-        let next_addr_to_kernel_bottom = kernel_bottom_addr.offset(1);
-        let frame_alloc_bitmaps_addr = next_addr_to_kernel_bottom
-            .offset(next_addr_to_kernel_bottom.align_offset(align_of::<u64>()) as isize);
+    /// Kernel bottom address must point to the start address of the allocation region and **must** be
+    /// aligned. Caller **must** also ensure that first 2MiB is unused.
+    pub unsafe fn new(allocation_region_start: *mut u8) -> Self {
+        let mut bitmaps: &'static mut [FrameAllocBitmap; BITMAP_COUNT_FOR_128G as usize] =
+            &mut *(allocation_region_start as *mut _);
+        for bitmap in bitmaps.iter_mut() {
+            bitmap.0 = 0;
+        }
 
         Self {
-            frame_alloc_bitmaps: &mut *(frame_alloc_bitmaps_addr as *mut _),
+            base_addr: allocation_region_start,
+            frame_alloc_bitmaps: bitmaps,
         }
     }
 
     pub fn alloc(&mut self, frame_count: u64) -> Option<Frame> {
+        let mut consec = 0;
+        let mut frame_idx_bitmap = None;
+        let mut bitmap_idx = 0;
+
         for (idx, bitmap) in self.frame_alloc_bitmaps.iter_mut().enumerate() {
-            if let Some(frame_idx_bitmap) = bitmap.alloc(frame_count) {
-                return Some(Frame(idx as u64 * 64 + frame_idx_bitmap))
+            if let (Some(frame_idx), consec_count) = bitmap.alloc(frame_count - consec) {
+                if let None = frame_idx_bitmap {
+                    frame_idx_bitmap = Some(frame_idx);
+                    bitmap_idx = idx;
+                }
+
+                consec += consec_count;
+            } else {
+                consec = 0;
+                frame_idx_bitmap = None;
+            }
+
+            if consec == frame_count {
+                break;
             }
         }
 
-        None
+        if let Some(frame_idx_bitmap) = frame_idx_bitmap && consec == frame_count {
+            Some(Frame { base_addr: self.base_addr, idx: bitmap_idx as u64 * 64 + frame_idx_bitmap })
+        } else {
+            None
+        }
     }
 
     /// Deallocates the given frame
@@ -61,8 +85,8 @@ impl FrameAllocator {
     /// Caller must ensure that the given frame is not used by anything
     /// when the function is called.
     pub unsafe fn dealloc(&mut self, frame: Frame) {
-        let bitmap_idx = frame.0 % 64;
-        self.frame_alloc_bitmaps[bitmap_idx as usize].dealloc(frame.0 - bitmap_idx);
+        let bitmap_idx = frame.idx / 64;
+        self.frame_alloc_bitmaps[bitmap_idx as usize].dealloc(frame.idx - bitmap_idx);
     }
 
     /// Deallocates consecutive frames
@@ -81,8 +105,8 @@ impl FrameAllocator {
     ///
     /// Useful for excluding unusable memory areas from allocation.
     pub fn mark_as_allocated(&mut self, frame: Frame) {
-        let bitmap_idx = frame.0 % 64;
-        self.frame_alloc_bitmaps[bitmap_idx as usize].mark_as_allocated(frame.0 - bitmap_idx);
+        let bitmap_idx = frame.idx / 64;
+        self.frame_alloc_bitmaps[bitmap_idx as usize].mark_as_allocated(frame.idx - bitmap_idx);
     }
 }
 
@@ -91,7 +115,7 @@ impl FrameAllocator {
 /// bitmap. So, the amount of bitmaps required to keep track of an entire 128GiB physical memory will be:
 ///
 /// `(128GiB / 4KiB) / 64`
-pub const BITMAP_COUNT_FOR_128G: u64 = ((128 * GiB) / (4 * KiB)) as u64 / 64;
+pub const BITMAP_COUNT_FOR_128G: u64 = ((128 * GiB) / (4 * KiB)) / 64;
 
 /// Stores frame allocation info in a 64bit bitmap.
 ///
@@ -108,12 +132,14 @@ pub struct FrameAllocBitmap(u64);
 impl FrameAllocBitmap {
     /// Searches the bitmap `frame_count` consecutive free frames.
     /// If it finds them, it returns the index of the bit.
-    pub fn alloc(&mut self, frame_count: u64) -> Option<u64> {
+    pub fn alloc(&mut self, frame_count: u64) -> (Option<u64>, u64) {
         let mut consec = 0;
         let mut resulting_frame = None;
 
-        for idx in 0..64 {
-            resulting_frame = Some(idx);
+        for idx in 0..64u64 {
+            if resulting_frame == None {
+                resulting_frame = Some(idx);
+            }
 
             let bit = self.0 >> idx & 1;
             if bit == 0 {
@@ -124,17 +150,17 @@ impl FrameAllocBitmap {
             }
 
             if consec == frame_count {
-                let resulting_frame = resulting_frame.unwrap();
-                for bit_idx in resulting_frame..=resulting_frame + frame_count {
-                    self.0 = self.0 | (1 << bit_idx);
-                }
-
                 break;
             }
         }
 
+        if let Some(resulting_frame) = resulting_frame.as_mut() {
+            for bit_idx in *resulting_frame..*resulting_frame + consec {
+                self.0 |= 1 << bit_idx;
+            }
+        }
 
-        resulting_frame
+        (resulting_frame, consec)
     }
 
     /// Deallocs the given frame by setting the corresponding bit in the bitmap
@@ -145,29 +171,42 @@ impl FrameAllocBitmap {
     /// Caller *must* ensure that the given frame is not used by anything else
     /// when this function is called.
     pub unsafe fn dealloc(&mut self, frame_idx: u64) {
-        self.0 = self.0 & (0 << frame_idx);
+        self.0 &= !(1 << frame_idx);
     }
 
     /// Marks the given frame as allocated.
     ///
     /// Useful for excluding unusable memory areas from allocation.
     pub fn mark_as_allocated(&mut self, frame_idx: u64) {
-        self.0 = self.0 & (1 << frame_idx);
+        self.0 |= 1 << frame_idx;
     }
 }
 
-pub const FRAME_SIZE: u64 = 4 * KiB as u64;
+pub const FRAME_SIZE: u64 = 4 * KiB;
 
 #[derive(Debug, Copy, Clone)]
-pub struct Frame(u64);
+pub struct Frame {
+    base_addr: *mut u8,
+    idx: u64,
+}
 
 impl Frame {
-    pub fn containing_address(addr: u64) -> Self {
-        Frame(addr / FRAME_SIZE)
+    /// Creates a Frame for given address
+    ///
+    /// ## Panics
+    ///
+    /// Will panic if given address is an invalid one(see more info about x86_64 valid memory address
+    /// for more info)
+    pub fn containing_address(base_addr: *mut u8, addr: u64) -> Self {
+        assert!(!(0x0000_8000_0000_0000..0xffff_8000_0000_0000).contains(&addr));
+        Frame {
+            base_addr,
+            idx: (base_addr as u64 - addr) / FRAME_SIZE,
+        }
     }
 
-    pub fn addr(&self) -> u64 {
-        self.0 * FRAME_SIZE
+    pub fn addr(&self) -> *mut u8 {
+        unsafe { self.base_addr.add((self.idx * FRAME_SIZE) as usize) }
     }
 }
 
@@ -175,6 +214,9 @@ impl Add<u64> for Frame {
     type Output = Self;
 
     fn add(self, rhs: u64) -> Self::Output {
-        Self(self.0 + rhs)
+        Self {
+            base_addr: self.base_addr,
+            idx: self.idx + rhs,
+        }
     }
 }

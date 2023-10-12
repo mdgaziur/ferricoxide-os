@@ -1,3 +1,4 @@
+#![feature(let_chains)]
 /*
  * FerricOxide OS is an operating system that aims to be posix compliant and memory safe
  * Copyright (C) 2023  MD Gaziur Rahman Noor

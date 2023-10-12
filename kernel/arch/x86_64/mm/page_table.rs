@@ -17,8 +17,12 @@
  */
 
 pub const PAGE_COUNT: usize = 512;
-pub const PML4: *const PageTable = 0xffff_ffff_ffff_f000 as *const _;
+pub const PML4: *mut PageTable = 0xffff_ffff_ffff_f000 as *mut _;
 
+#[derive(Debug)]
 pub struct PageTable {
-    entries: [usize; PAGE_COUNT],
+    pub entries: [Entry; PAGE_COUNT],
 }
+
+#[derive(Debug)]
+pub struct Entry(u64);

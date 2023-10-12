@@ -30,5 +30,5 @@ pub unsafe fn arch_entry(multiboot_info_addr: usize) {
             .unwrap_or("<invalid bootloader>")
     );
 
-    mm::init();
+    mm::init(&boot_info);
 }
