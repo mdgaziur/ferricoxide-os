@@ -1,4 +1,6 @@
 #![feature(let_chains)]
+#![feature(pointer_is_aligned)]
+#![feature(pointer_byte_offsets)]
 /*
  * FerricOxide OS is an operating system that aims to be posix compliant and memory safe
  * Copyright (C) 2023  MD Gaziur Rahman Noor
@@ -18,12 +20,16 @@
  */
 #![no_std]
 
+extern crate alloc;
+
 mod arch;
 #[macro_use]
 mod serial;
+mod kutils;
 mod units;
 
 use crate::arch::entry::arch_entry;
+
 use core::hint::spin_loop;
 use core::panic::PanicInfo;
 
@@ -64,7 +70,10 @@ fn kmain1(multiboot_info_addr: usize) -> ! {
 }
 
 #[panic_handler]
-fn panic_handler(_panic_info: &PanicInfo) -> ! {
+fn panic_handler(panic_info: &PanicInfo) -> ! {
+    serial_println!("[Kernel Panic]");
+    serial_println!("{}", panic_info);
+
     loop {
         spin_loop()
     }

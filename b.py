@@ -91,7 +91,7 @@ def make_iso():
 
 def boot():
     print("Booting...")
-    command = f"qemu-system-{ferricoxide_architecture} -cdrom build/{ferricoxide_architecture}/{ferricoxide_architecture}-ferricoxide_os.iso -d cpu_reset -serial stdio -no-reboot -no-shutdown -s"
+    command = f"qemu-system-{ferricoxide_architecture} -cdrom build/{ferricoxide_architecture}/{ferricoxide_architecture}-ferricoxide_os.iso -serial stdio -d int -no-reboot -no-shutdown -s"
     subprocess.run(shlex.split(command))
 
 def format_kernel_code():

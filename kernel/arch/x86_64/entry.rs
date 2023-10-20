@@ -18,9 +18,10 @@
 
 use crate::arch::mm;
 use crate::serial_println;
+use multiboot2::BootInformation;
 
 pub unsafe fn arch_entry(multiboot_info_addr: usize) {
-    let boot_info = unsafe { multiboot2::load(multiboot_info_addr) }.unwrap();
+    let boot_info = unsafe { BootInformation::load(multiboot_info_addr as *const _) }.unwrap();
     serial_println!(
         "Kernel was loaded by \"{}\"",
         boot_info

@@ -17,31 +17,33 @@
  */
 
 use crate::arch::mm::frame_alloc::FrameAllocator;
-use core::mem::align_of;
-use multiboot2::{BootInformation, MemoryAreaType};
 
+use crate::arch::mm::paging::remap_kernel;
 use crate::serial_println;
 use crate::units::MiB;
+use core::fmt::{Debug, Formatter};
+use linked_list_allocator::LockedHeap;
+use multiboot2::{BootInformation, MemoryAreaType};
 
 pub mod frame_alloc;
 pub mod page_table;
+pub mod paging;
+
+#[global_allocator]
+static ALLOCATOR: LockedHeap = LockedHeap::empty(); // TODO: implement own allocator
+
+pub const KERNEL_HEAP_START: *mut u8 = 0xcafebeef as *mut u8;
+pub const KERNEL_HEAP_SIZE: usize = 32 * MiB;
 
 pub fn init(boot_info: &BootInformation) {
     let memory_map_tag = boot_info.memory_map_tag().unwrap();
-    let elf_sections_tag = boot_info.elf_sections_tag().unwrap();
+    let elf_sections = boot_info.elf_sections().unwrap();
 
-    let mut available_memory = 0;
-    let mut allocation_region = 0;
-    let mut allocation_region_size = 0;
+    let mut total_available_memory = 0usize;
     serial_println!("\n|<=============== Memory Areas ===============>|");
-    for (idx, memory_area) in memory_map_tag.memory_areas().enumerate() {
+    for (idx, memory_area) in memory_map_tag.memory_areas().iter().enumerate() {
         if memory_area.typ() == MemoryAreaType::Available {
-            available_memory += memory_area.size();
-
-            if allocation_region_size < memory_area.size() {
-                allocation_region = memory_area.start_address();
-                allocation_region_size = memory_area.size();
-            }
+            total_available_memory += memory_area.size() as usize;
         }
 
         serial_println!("Memory area: {}", idx + 1);
@@ -53,12 +55,12 @@ pub fn init(boot_info: &BootInformation) {
 
     // Linker script requires that the kernel starts at 1M
     let kernel_start_addr = 0x100000;
-    let mut kernel_end_addr = 0;
+    let mut kernel_end_addr = 0usize;
 
     serial_println!("|<=============== Kernel ELF Sections ===============>|");
-    for elf_section in elf_sections_tag.sections() {
-        if kernel_end_addr < elf_section.end_address() {
-            kernel_end_addr = elf_section.end_address();
+    for elf_section in elf_sections {
+        if kernel_end_addr < elf_section.end_address() as usize {
+            kernel_end_addr = elf_section.end_address() as usize;
         }
 
         serial_println!("Elf section: {:?}", elf_section.name().unwrap());
@@ -67,37 +69,78 @@ pub fn init(boot_info: &BootInformation) {
         serial_println!("==> Size: {} bytes", elf_section.size());
         serial_println!("==> Type: {:?}\n", elf_section.section_type());
     }
-    let kernel_size = kernel_end_addr - kernel_start_addr;
-    if allocation_region < kernel_end_addr {
-        serial_println!(
-            "[NOTE]: kernel resides in the allocation region. Adjusting it to kernel end address"
-        );
-        serial_println!("======> Allocation region start: {:#x}", allocation_region);
 
-        // Point to the next valid(aligned) address for the start of the allocation region.
-        // SAFETY: the address is valid.
-        unsafe {
-            let kernel_end_ptr = kernel_end_addr as *mut u8;
-            let mut kernel_end_next_ptr = kernel_end_ptr.add(1);
-            kernel_end_next_ptr =
-                kernel_end_next_ptr.add(kernel_end_next_ptr.align_offset(align_of::<u64>()));
-            allocation_region = kernel_end_next_ptr as u64;
-        }
-        allocation_region_size -= kernel_size;
-
-        serial_println!(
-            "======> Adjusted allocation region start: {:#x}\n",
-            allocation_region
-        );
-    }
+    let memory_used = (kernel_end_addr - kernel_start_addr)
+        + (boot_info.end_address() - boot_info.start_address())
+        + FrameAllocator::SIZE;
+    let free_memory = total_available_memory - memory_used;
 
     serial_println!("=> Kernel start address: {:#x}", kernel_start_addr);
     serial_println!("=> Kernel end address: {:#x}", kernel_end_addr);
-    serial_println!("=> Kernel size: {:.2} MiB", kernel_size as f64 / MiB as f64);
-    serial_println!("=> Free memory: {:.2} MiB", allocation_region_size / MiB);
+    serial_println!(
+        "=> Kernel size: {:.4} MiB",
+        (kernel_end_addr - kernel_start_addr) as f64 / MiB as f64
+    );
+    serial_println!("=> Used memory: {:.4} MiB", memory_used as f64 / MiB as f64);
+    serial_println!(
+        "=> Total available memory: {:.4} MiB",
+        total_available_memory as f64 / MiB as f64
+    );
+    serial_println!("=> Free memory: {:.4} MiB", free_memory as f64 / MiB as f64);
 
-    // TODO: only works on one big allocation region. In some cases, reserved memories can break one
-    //       region into multiple parts. In such cases, only the biggest is chosen. This may result
-    //       in a huge waste of memory.
-    let mut frame_allocator = unsafe { FrameAllocator::new(allocation_region as _) };
+    let frame_allocator = FrameAllocator::new(
+        memory_map_tag.memory_areas(),
+        boot_info.start_address(),
+        boot_info.end_address(),
+        kernel_start_addr,
+        kernel_end_addr,
+    );
+    let mut kmm = KernelMM {
+        frame_allocator,
+        total_available_memory,
+        free_memory,
+    };
+
+    remap_kernel(&mut kmm, boot_info);
+    unsafe { ALLOCATOR.lock().init(KERNEL_HEAP_START, KERNEL_HEAP_SIZE) }
+}
+
+pub struct KernelMM {
+    frame_allocator: FrameAllocator,
+    total_available_memory: usize,
+    free_memory: usize,
+}
+
+#[derive(Copy, Clone)]
+pub struct PhysicalAddress(usize);
+
+#[derive(Copy, Clone)]
+pub struct VirtualAddress(usize);
+
+impl From<usize> for PhysicalAddress {
+    fn from(val: usize) -> Self {
+        PhysicalAddress(val)
+    }
+}
+
+impl Debug for PhysicalAddress {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        f.debug_tuple("PhysicalAddress")
+            .field(&format_args!("{:#x}", self.0))
+            .finish()
+    }
+}
+
+impl From<usize> for VirtualAddress {
+    fn from(val: usize) -> Self {
+        VirtualAddress(val)
+    }
+}
+
+impl Debug for VirtualAddress {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        f.debug_tuple("VirtualAddress")
+            .field(&format_args!("{:#x}", self.0))
+            .finish()
+    }
 }
