@@ -16,20 +16,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::arch::{mm, mm_bck};
-use crate::{serial_println, BOOT_INFO};
+use crate::drivers::vga::VGA_DRIVER_INSTANCE;
+use core::ops::Deref;
 
-pub unsafe fn arch_entry() {
-    let boot_info = BOOT_INFO.get().unwrap();
-    serial_println!(
-        "Kernel was loaded by \"{}\"",
-        boot_info
-            .boot_loader_name_tag()
-            .unwrap()
-            .name()
-            .unwrap_or("<invalid bootloader>")
-    );
+pub mod vga;
 
-    mm::init(&boot_info);
-    // mm_bck::init(&boot_info);
+pub fn init_drivers() {
+    let _ = VGA_DRIVER_INSTANCE.deref();
 }

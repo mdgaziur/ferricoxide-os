@@ -15,9 +15,9 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-use crate::arch::mm::frame_alloc::{Frame, FrameAllocator, FrameIter};
-use crate::arch::mm::page_table::{ActivePageTable, InactivePageTable, PageTable, PT};
-use crate::arch::mm::{KernelMM, VirtualAddress, KERNEL_HEAP_SIZE, KERNEL_HEAP_START};
+use crate::arch::mm_bck::frame_alloc::{Frame, FrameAllocator, FrameIter};
+use crate::arch::mm_bck::page_table::{ActivePageTable, InactivePageTable, PageTable, PT};
+use crate::arch::mm_bck::{KernelMM, VirtualAddress, KERNEL_HEAP_SIZE, KERNEL_HEAP_START};
 use crate::serial_println;
 use crate::units::KiB;
 use bitflags::bitflags;
@@ -28,24 +28,27 @@ pub const PAGE_SIZE: usize = 4 * KiB;
 
 pub const PAGE_COUNT: usize = 512;
 
-pub fn remap_kernel(kmm: &mut KernelMM, boot_info: &BootInformation) {
+pub fn remap_kernel<'a>(
+    frame_allocator: &mut FrameAllocator,
+    boot_info: &BootInformation,
+) -> ActivePageTable<'a> {
     let mut temporary_page = TemporaryPage::new(Page { number: 0xdeadbeef });
 
     let mut active_table = unsafe { ActivePageTable::new() };
     let new_table = {
-        let frame = kmm.frame_allocator.alloc(1).expect("OOM: sucks dude");
+        let frame = frame_allocator.alloc(1).expect("OOM: sucks dude");
         InactivePageTable::new(
             &mut temporary_page,
             frame,
             &mut active_table,
-            &mut kmm.frame_allocator,
+            frame_allocator,
         )
     };
 
     active_table.with(
         &new_table,
         &mut temporary_page,
-        &mut kmm.frame_allocator,
+        frame_allocator,
         |mapper, frame_allocator| {
             let elf_sections = boot_info.elf_sections().unwrap();
 
@@ -76,10 +79,11 @@ pub fn remap_kernel(kmm: &mut KernelMM, boot_info: &BootInformation) {
             }
 
             if let Some(Ok(framebuffer)) = boot_info.framebuffer_tag() {
-                serial_println!("Mapping VGA Framebuffer");
                 for frame in FrameIter::new(
                     framebuffer.address() as usize,
-                    framebuffer.address() as usize + framebuffer.size() - 1,
+                    (framebuffer.address() + (framebuffer.height() * framebuffer.pitch()) as u64)
+                        as usize
+                        - 1,
                 ) {
                     mapper.identity_map(frame, PageTableEntryFlags::RW, frame_allocator);
                 }
@@ -93,7 +97,7 @@ pub fn remap_kernel(kmm: &mut KernelMM, boot_info: &BootInformation) {
             serial_println!("Mapping Kernel heap");
             for page in PageIter::new(
                 KERNEL_HEAP_START as usize,
-                KERNEL_HEAP_START as usize + KERNEL_HEAP_SIZE,
+                KERNEL_HEAP_START as usize + KERNEL_HEAP_SIZE - 1,
             ) {
                 mapper.map(page, PageTableEntryFlags::RW, frame_allocator);
             }
@@ -104,8 +108,9 @@ pub fn remap_kernel(kmm: &mut KernelMM, boot_info: &BootInformation) {
     let old_pml4_page =
         Page::containing_address(VirtualAddress(old_table.pml4_frame.start_address().0));
     unsafe {
-        active_table.unmap(old_pml4_page, &mut kmm.frame_allocator);
+        active_table.unmap(old_pml4_page, frame_allocator);
     }
+    active_table
 }
 
 pub struct PageTableEntry(usize);

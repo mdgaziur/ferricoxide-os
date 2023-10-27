@@ -16,13 +16,13 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::arch::mm::frame_alloc::{Frame, FrameAllocator};
+use crate::arch::mm_bck::frame_alloc::{Frame, FrameAllocator};
 use core::arch::asm;
 use core::fmt::Debug;
 
-use crate::arch::mm::paging::{PageTableEntryFlags, TemporaryPage, PAGE_SIZE};
-use crate::arch::mm::{PhysicalAddress, VirtualAddress};
-use crate::arch::x86_64::mm::paging::{Page, PageTableEntry, PAGE_COUNT};
+use crate::arch::mm_bck::paging::{PageTableEntryFlags, TemporaryPage, PAGE_SIZE};
+use crate::arch::mm_bck::{PhysicalAddress, VirtualAddress};
+use crate::arch::x86_64::mm_bck::paging::{Page, PageTableEntry, PAGE_COUNT};
 
 use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut, Index, IndexMut};

@@ -16,5 +16,16 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use core::arch::asm;
+
 pub mod entry;
+pub mod mm_bck;
 pub mod mm;
+
+pub fn halt_execution() -> ! {
+    loop {
+        unsafe {
+            asm!("hlt");
+        }
+    }
+}

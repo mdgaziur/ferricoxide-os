@@ -16,7 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::arch::mm::PhysicalAddress;
+use crate::arch::mm_bck::PhysicalAddress;
 use crate::kutils::BitMap;
 use crate::units::{GiB, KiB};
 

@@ -16,23 +16,26 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::arch::mm::frame_alloc::FrameAllocator;
-
-use crate::arch::mm::paging::remap_kernel;
+use crate::arch::mm_bck::frame_alloc::FrameAllocator;
+use crate::arch::mm_bck::page_table::ActivePageTable;
+use crate::arch::mm_bck::paging::remap_kernel;
 use crate::serial_println;
 use crate::units::MiB;
 use core::fmt::{Debug, Formatter};
 use linked_list_allocator::LockedHeap;
 use multiboot2::{BootInformation, MemoryAreaType};
+use spin::{Mutex, Once};
 
 pub mod frame_alloc;
 pub mod page_table;
 pub mod paging;
 
-#[global_allocator]
-static ALLOCATOR: LockedHeap = LockedHeap::empty(); // TODO: implement own allocator
+// #[global_allocator]
+pub static ALLOCATOR: LockedHeap = LockedHeap::empty(); // TODO: implement own allocator
 
-pub const KERNEL_HEAP_START: *mut u8 = 0xcafebeef as *mut u8;
+pub static KMM: Once<KernelMM> = Once::new();
+
+pub const KERNEL_HEAP_START: *mut u8 = 0xcabedeadbed as *mut u8;
 pub const KERNEL_HEAP_SIZE: usize = 32 * MiB;
 
 pub fn init(boot_info: &BootInformation) {
@@ -88,27 +91,30 @@ pub fn init(boot_info: &BootInformation) {
     );
     serial_println!("=> Free memory: {:.4} MiB", free_memory as f64 / MiB as f64);
 
-    let frame_allocator = FrameAllocator::new(
+    let mut frame_allocator = FrameAllocator::new(
         memory_map_tag.memory_areas(),
         boot_info.start_address(),
         boot_info.end_address(),
         kernel_start_addr,
         kernel_end_addr,
     );
-    let mut kmm = KernelMM {
-        frame_allocator,
-        total_available_memory,
-        free_memory,
+    let active_page_table = remap_kernel(&mut frame_allocator, boot_info);
+
+    // Initialize the heap
+    unsafe { ALLOCATOR.lock().init(KERNEL_HEAP_START, KERNEL_HEAP_SIZE) }
+
+    // Initialize the KernelMM struct
+    let kmm = KernelMM {
+        frame_allocator: Mutex::new(frame_allocator),
+        active_page_table: Mutex::new(active_page_table),
     };
 
-    remap_kernel(&mut kmm, boot_info);
-    unsafe { ALLOCATOR.lock().init(KERNEL_HEAP_START, KERNEL_HEAP_SIZE) }
+    KMM.call_once(|| kmm);
 }
 
-pub struct KernelMM {
-    frame_allocator: FrameAllocator,
-    total_available_memory: usize,
-    free_memory: usize,
+pub struct KernelMM<'a> {
+    pub frame_allocator: Mutex<FrameAllocator>,
+    pub active_page_table: Mutex<ActivePageTable<'a>>,
 }
 
 #[derive(Copy, Clone)]

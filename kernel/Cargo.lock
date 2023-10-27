@@ -45,6 +45,8 @@ dependencies = [
  "lazy_static",
  "linked_list_allocator",
  "multiboot2",
+ "noto-sans-mono-bitmap",
+ "once",
  "spin 0.9.8",
  "uart_16550",
  "x86_64",
@@ -96,6 +98,18 @@ dependencies = [
  "ptr_meta",
  "uefi-raw",
 ]
+
+[[package]]
+name = "noto-sans-mono-bitmap"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a27daf9557165efe1d09b52f97393bf6283cadb0a76fbe64a1061e15553a994a"
+
+[[package]]
+name = "once"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "60bfe75a40f755f162b794140436c57845cb106fd1467598631c76c6fff08e28"
 
 [[package]]
 name = "proc-macro2"

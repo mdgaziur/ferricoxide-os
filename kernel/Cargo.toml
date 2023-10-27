@@ -8,6 +8,10 @@ authors = ["MD Gaziur Rahman Noor <mdgaziurrahmannoor@gmail.com>"]
 path = "kernel.rs"
 crate-type = ["staticlib"]
 
+[profile.release]
+panic = "abort"
+debug = true
+
 [profile.dev]
 opt-level = 2
 panic = "abort"
@@ -20,3 +24,5 @@ spin = "0.9.8"
 bitflags = "2.4.0"
 x86_64 = { version = "0.14.11", features = ["instructions"] }
 linked_list_allocator = "0.10.5"
+noto-sans-mono-bitmap = "0.2.0"
+once = "0.3.4"

@@ -1,6 +1,7 @@
 #![feature(let_chains)]
 #![feature(pointer_is_aligned)]
 #![feature(pointer_byte_offsets)]
+#![feature(abi_x86_interrupt)]
 /*
  * FerricOxide OS is an operating system that aims to be posix compliant and memory safe
  * Copyright (C) 2023  MD Gaziur Rahman Noor
@@ -25,13 +26,21 @@ extern crate alloc;
 mod arch;
 #[macro_use]
 mod serial;
+mod drivers;
 mod kutils;
 mod units;
 
 use crate::arch::entry::arch_entry;
-
-use core::hint::spin_loop;
+use crate::arch::halt_execution;
+use crate::drivers::init_drivers;
+use crate::drivers::vga::{Pixel, VGA_DRIVER_INSTANCE};
+use alloc::vec;
+use alloc::vec::Vec;
 use core::panic::PanicInfo;
+use multiboot2::{BootInformation, BootInformationHeader};
+use spin::Once;
+
+static BOOT_INFO: Once<BootInformation> = Once::new();
 
 /// This is the Rust entry point of the kernel. At first it calls the architecture specific entry
 /// function to set up various architecture specific stuff like memory management, interrupt handlers,
@@ -56,17 +65,23 @@ use core::panic::PanicInfo;
 /// in terminal(if used). If anything fails when running on bare metal, the user is out of luck unless
 /// s/he can read the outputs from COM1 port(0x3F8).
 #[no_mangle]
-fn kmain1(multiboot_info_addr: usize) -> ! {
-    // SAFETY: the address is loaded directly into edi from which the first argument(multiboot_info_addr)
-    // is loaded. The code in boot.s also ensures that the proper startup sequence is being followed before
-    // jumping to kmain1.
-    unsafe {
-        arch_entry(multiboot_info_addr);
-    }
+fn kmain1(multiboot_info_addr: *const BootInformationHeader) -> ! {
+    BOOT_INFO.call_once(|| unsafe { BootInformation::load(multiboot_info_addr).unwrap() });
 
-    loop {
-        spin_loop()
-    }
+    unsafe { arch_entry() }
+
+    init_drivers();
+    //
+    // let mut r = 100u8;
+    // let mut g = 200u8;
+    // let mut b = 145u8;
+    // VGA_DRIVER_INSTANCE.lock().fill(Pixel::new(r, g, b, 0, 0));
+    // VGA_DRIVER_INSTANCE.lock().swap();
+    // (r, _) = r.overflowing_add(1);
+    // (g, _) = g.overflowing_add(1);
+    // (b, _) = b.overflowing_add(1);
+
+    halt_execution();
 }
 
 #[panic_handler]
@@ -74,7 +89,5 @@ fn panic_handler(panic_info: &PanicInfo) -> ! {
     serial_println!("[Kernel Panic]");
     serial_println!("{}", panic_info);
 
-    loop {
-        spin_loop()
-    }
+    halt_execution();
 }
