@@ -1,0 +1,4 @@
+# ferricoxide-os
+FerricOxide OS
+
+THIS IS THE FINAL REWRITEEEE AAAAAAA
