@@ -1,0 +1,17 @@
+[package]
+name = "prekernel"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+path = "prekernel.rs"
+crate-type = ["staticlib"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+multiboot2 = { version = "0.20.2", default-features = false }
+spin = "0.9.8"
+lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
+uart_16550 = "0.3.0"
+elf_rs = "0.3.1"

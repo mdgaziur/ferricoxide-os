@@ -1,0 +1,6 @@
+[unstable]
+build-std-features = ["compiler-builtins-mem"]
+build-std = ["core", "compiler_builtins", "alloc"]
+
+[build]
+target = "arch/x86_64/x86_64-ferricoxide_os.json"
