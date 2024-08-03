@@ -16,17 +16,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-mod entry;
-
-use crate::{print_to_screen, serial_println};
+use crate::{dbg, serial_println};
 use core::arch::asm;
-use core::fmt::{Arguments, Write};
-use multiboot2::BootInformation;
-use uart_16550::SerialPort;
-use crate::arch::x86_64::entry::really_kernel_start;
+use multiboot2::{BootInformation, BootInformationHeader};
+use spin::Once;
+
+pub(super) static BOOT_INFO: Once<BootInformation> = Once::new();
 
 #[no_mangle]
-unsafe extern "C" fn kernel_start(boot_information: *const BootInformation) -> ! {
+unsafe extern "C" fn kernel_start(boot_information_header: *const BootInformationHeader) -> ! {
     asm!(
         "mov ax, 0
         mov ss, ax
@@ -36,5 +34,16 @@ unsafe extern "C" fn kernel_start(boot_information: *const BootInformation) -> !
         mov gs, ax"
     );
 
-    really_kernel_start(boot_information);
+    let mb_info = unsafe { BootInformation::load(boot_information_header).unwrap() };
+    BOOT_INFO.call_once(|| mb_info);
+
+    serial_println!("The kernel is aliveeeeeeee!!!!!!!!!!!");
+
+    dbg!(BOOT_INFO.get().unwrap());
+
+    loop {
+        unsafe {
+            asm!("hlt");
+        }
+    }
 }

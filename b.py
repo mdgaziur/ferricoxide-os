@@ -90,7 +90,7 @@ def reformat_code(directory: str):
     print(f"Reformatting code at `{directory}`...")
     cur_dir = os.path.abspath(os.path.curdir)
     os.chdir(directory)
-    execute_command(f"reformat code at `{directory}`", "cargo fmt", True)
+    execute_command(f"reformat code at `{directory}`", "cargo fmt", False)
     os.chdir(cur_dir)
 
 
@@ -98,7 +98,7 @@ def fix_code(directory: str):
     print(f"Fixing code at `{directory}`...")
     cur_dir = os.path.abspath(os.path.curdir)
     os.chdir(directory)
-    execute_command(f"fix code at `{directory}`", "cargo clippy --fix  --allow-dirty --allow-staged", True)
+    execute_command(f"fix code at `{directory}`", "cargo clippy --fix  --allow-dirty --allow-staged", False)
     os.chdir(cur_dir)
 
 

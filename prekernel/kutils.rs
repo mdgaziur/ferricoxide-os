@@ -16,10 +16,13 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#[allow(unused)]
 pub const GB: usize = MB * 1024;
 
+#[allow(unused)]
 pub const MB: usize = KB * 1024;
 
+#[allow(unused)]
 pub const KB: usize = 1024;
 
 #[macro_export]

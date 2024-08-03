@@ -17,7 +17,7 @@
  */
 
 use crate::kutils::{KB, MB};
-use crate::{_binary_kernel_bin_end, _binary_kernel_bin_start, dbg, serial_print, serial_println};
+use crate::{_binary_kernel_bin_end, _binary_kernel_bin_start, serial_print, serial_println};
 use core::arch::asm;
 use core::mem::size_of;
 use core::ptr::addr_of;
@@ -50,9 +50,7 @@ static GDT: [u64; 2] = [0, (1 << 43) | (1 << 44) | (1 << 47) | (1 << 53)];
 #[link_section = ".kernel_content"]
 static mut KERNEL_CONTENT: [u8; 8 * MB] = [0; 8 * MB];
 
-const PAGE_SIZE: usize = 4 * KB;
-
-unsafe fn map_kernel_to_higher_half(kernel_start_addr: u32, kernel_elf: &Elf) {
+unsafe fn map_kernel_to_higher_half(kernel_elf: &Elf) {
     let boot_info = BOOT_INFO.get().unwrap();
     let basic_memory_info = *boot_info.basic_memory_info_tag().unwrap();
 
@@ -66,26 +64,28 @@ unsafe fn map_kernel_to_higher_half(kernel_start_addr: u32, kernel_elf: &Elf) {
         PML4[0] = (addr_of!(PDPT) as u32 | 0b11) as u64;
         PDPT[0] = (addr_of!(PDT) as u32 | 0b11) as u64;
 
-        for entry_idx in 0..PDT.len() {
+        for (entry_idx, pdt_entry) in PDT.iter_mut().enumerate() {
             let entry = (0x200000 * entry_idx) | 0b10000011;
-            PDT[entry_idx] = entry as u64;
+            *pdt_entry = entry as u64;
         }
     }
 
     // 2. Map the kernel using 2MB pages to keep the paging structure simple.
     unsafe fn map_kernel_from_phdr(offset: usize, phdr: &ProgramHeaderEntry) {
         let Some(phdr_content) = phdr.content() else {
-            serial_println!("Skipping program header because it has no content: {:?}", phdr);
+            serial_println!(
+                "Skipping program header because it has no content: {:?}",
+                phdr
+            );
             return;
         };
 
-        for idx in offset..phdr.filesz() as usize - 1 {
-            KERNEL_CONTENT[idx] = phdr_content[idx - offset];
-        }
+        KERNEL_CONTENT[offset..(phdr.filesz() as usize - 1)]
+            .copy_from_slice(&phdr_content[..((phdr.filesz() as usize - 1) - offset)]);
     }
 
     let mut phdr_iter = kernel_elf.program_header_iter();
-    let first_phdr = phdr_iter.nth(0).unwrap();
+    let first_phdr = phdr_iter.next().unwrap();
     let first_phdr_offset = first_phdr.offset() as usize;
     if first_phdr.ph_type() == ProgramType::LOAD {
         map_kernel_from_phdr(0, &first_phdr);
@@ -100,9 +100,7 @@ unsafe fn map_kernel_to_higher_half(kernel_start_addr: u32, kernel_elf: &Elf) {
     let higher_half_pdt_index = (first_phdr.vaddr() >> 21 & 0b111111111) as usize;
 
     PML4[higher_half_pml4_index] = (addr_of!(HIGHER_HALF_PDPT) as u32 | 0b11) as u64;
-    HIGHER_HALF_PDPT[higher_half_pdpt_index] =
-        (addr_of!(HIGHER_HALF_PDT) as u32 | 0b11) as u64;
-
+    HIGHER_HALF_PDPT[higher_half_pdpt_index] = (addr_of!(HIGHER_HALF_PDT) as u32 | 0b11) as u64;
 
     let kernel_content_start = addr_of!(KERNEL_CONTENT) as usize;
     let kernel_content_end = kernel_content_start + KERNEL_CONTENT.len() - 1;
@@ -169,8 +167,8 @@ unsafe fn load_gdt() {
 
 unsafe fn call_kernel(mb_ptr: u32, kernel_addr: u32) {
     asm!(
-    "
-    mov eax, {}
+    "mov edi, {}
+    // Offset for the code segment in the GDT
     push 0x8
     push {}
     retf", in(reg) mb_ptr, in(reg) kernel_addr)
@@ -195,14 +193,14 @@ pub extern "cdecl" fn prekernel_main(mb_ptr: *const BootInformationHeader) -> ! 
         );
         let kernel_elf = Elf::from_bytes(kernel).unwrap();
 
-        map_kernel_to_higher_half(kernel_start_addr as u32, &kernel_elf);
+        map_kernel_to_higher_half(&kernel_elf);
         enable_paging();
         load_gdt();
 
         let kernel_text_section = kernel_elf.lookup_section(b".text").unwrap();
         let kernel_text_section_content = kernel_text_section.content().unwrap();
-        for i in 0..4 {
-            serial_print!("{:x} ", kernel_text_section_content[i])
+        for byte in &kernel_text_section_content[0..4] {
+            serial_print!("{:x} ", byte)
         }
         serial_println!();
 
