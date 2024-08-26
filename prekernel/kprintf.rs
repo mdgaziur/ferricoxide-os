@@ -67,7 +67,9 @@ macro_rules! dbg {
 #[macro_export]
 macro_rules! serial_print {
     ($($arg:tt)*) => {
-        $crate::kprintf::print(format_args!($($arg)*))
+        $crate::kprintf::print(format_args!("\x1b[0;93m")); // set color to yellow to differentiate prekernel output
+        $crate::kprintf::print(format_args!($($arg)*));
+        $crate::kprintf::print(format_args!("\x1b[0;0m"));
     };
 }
 

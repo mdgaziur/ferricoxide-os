@@ -45,14 +45,13 @@ static mut HIGHER_HALF_PDT: [u64; 512] = [0; 512];
 
 static GDT: [u64; 2] = [0, (1 << 43) | (1 << 44) | (1 << 47) | (1 << 53)];
 
-/// Assumes that the kernel never exceeds 8MB in size
-/// NOTE: Bump the size in case kernel exceeds 8MB in size
+/// Assumes that the kernel never exceeds 16MB in size
+/// NOTE: Bump the size in case kernel exceeds 16MB in size
 #[link_section = ".kernel_content"]
-static mut KERNEL_CONTENT: [u8; 8 * MB] = [0; 8 * MB];
+static mut KERNEL_CONTENT: [u8; 16 * MB] = [0; 16 * MB];
 
 unsafe fn map_kernel_to_higher_half(kernel_elf: &Elf) {
     let boot_info = BOOT_INFO.get().unwrap();
-    let basic_memory_info = *boot_info.basic_memory_info_tag().unwrap();
 
     serial_println!(
         "Memory size: {}MB",
@@ -165,13 +164,25 @@ unsafe fn load_gdt() {
     asm!("lgdt [{}]", in(reg) addr_of!(pointer));
 }
 
-unsafe fn call_kernel(mb_ptr: u32, kernel_addr: u32) {
+/// Passes information about the kernel's physical address after it is copied to [`KERNEL_CONTENT`].
+///
+/// NOTE:
+/// Definition *must* match with `kernel::kutils::KernelContentInfo`
+#[derive(Debug, Copy, Clone)]
+#[repr(C)]
+pub struct KernelContentInfo {
+    pub phys_start_addr: u32,
+    pub phys_end_addr: u32,
+}
+
+unsafe fn call_kernel(mb_ptr: u32, kernel_content_info: u32, kernel_addr: u32) {
     asm!(
     "mov edi, {}
+    mov esi, {}
     // Offset for the code segment in the GDT
     push 0x8
     push {}
-    retf", in(reg) mb_ptr, in(reg) kernel_addr)
+    retf", in(reg) mb_ptr, in(reg) kernel_content_info, in(reg) kernel_addr)
 }
 
 #[no_mangle]
@@ -179,34 +190,45 @@ pub extern "cdecl" fn prekernel_main(mb_ptr: *const BootInformationHeader) -> ! 
     let mb_info = unsafe { BootInformation::load(mb_ptr).unwrap() };
     BOOT_INFO.call_once(|| mb_info);
 
-    unsafe {
-        let kernel_start_addr = &_binary_kernel_bin_start as *const u16;
-        let kernel_end_addr = &_binary_kernel_bin_end as *const u16;
-        let kernel_size = kernel_end_addr as usize - kernel_start_addr as usize;
+    let kernel_start_addr = unsafe { &_binary_kernel_bin_start } as *const u16;
+    let kernel_end_addr = unsafe { &_binary_kernel_bin_end } as *const u16;
 
-        serial_println!("Kernel ELF start: {:p}", kernel_start_addr);
-        serial_println!("Kernel ELF size: {}KB", kernel_size as f32 / KB as f32);
+    serial_println!("Kernel ELF start: {:p}", kernel_start_addr);
+    serial_println!("Kernel ELF size: {}KB", kernel_size as f32 / KB as f32);
 
-        let kernel = slice::from_raw_parts(
+    let kernel = unsafe {
+        slice::from_raw_parts(
             kernel_start_addr as *const u8,
             kernel_end_addr as usize - kernel_start_addr as usize,
-        );
-        let kernel_elf = Elf::from_bytes(kernel).unwrap();
+        )
+    };
 
+    let kernel_elf = Elf::from_bytes(kernel).unwrap();
+
+    unsafe {
         map_kernel_to_higher_half(&kernel_elf);
         enable_paging();
         load_gdt();
+    }
 
-        let kernel_text_section = kernel_elf.lookup_section(b".text").unwrap();
-        let kernel_text_section_content = kernel_text_section.content().unwrap();
-        for byte in &kernel_text_section_content[0..4] {
-            serial_print!("{:x} ", byte)
-        }
-        serial_println!();
+    let kernel_text_section = kernel_elf.lookup_section(b".text").unwrap();
+    let kernel_text_section_content = kernel_text_section.content().unwrap();
+    for byte in &kernel_text_section_content[0..4] {
+        serial_print!("{:x} ", byte);
+    }
+    serial_println!();
 
+    let kernel_content_end = unsafe { &KERNEL_CONTENT[KERNEL_CONTENT.len() - 1] };
+    let kernel_content_info = KernelContentInfo {
+        phys_start_addr: addr_of!(unsafe { KERNEL_CONTENT }) as u32,
+        phys_end_addr: addr_of!(kernel_content_end) as u32,
+    };
+
+    unsafe {
         call_kernel(
             // offset shouldn't be big enough to cause issues when casting to 32bit unsigned integer
             mb_ptr as u32,
+            addr_of!(kernel_content_info) as u32,
             addr_of!(KERNEL_CONTENT) as u32,
         );
     }
