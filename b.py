@@ -75,6 +75,9 @@ def execute_command(operation: str, cmd: str, exit_on_failure: bool = False):
         return_code = e.returncode
     except FileNotFoundError:
         return_code = -1
+    except KeyboardInterrupt:
+        eprint(f"\033[91mReceived keyboard interrupt while performing task `{operation}`. Bye!\033[0m")
+        exit(1)
 
     if return_code == -1:
         eprint(f"\033[91mFailed to {operation}. This indicates that the required program is missing on your "
