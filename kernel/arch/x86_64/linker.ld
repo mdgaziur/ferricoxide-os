@@ -5,6 +5,7 @@ SECTIONS {
 
     .text :
     {
+        *(.text.kernel_start)
         *(.text .text.*)
         . = ALIGN(4K);
     }
