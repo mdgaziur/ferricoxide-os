@@ -59,6 +59,7 @@ build_config = {
     "build": False,
     "boot": False,
     "extra_qemu_args": "",
+    "ovmf_path": "/usr/share/ovmf/x64/OVMF.fd",
 }
 
 
@@ -198,6 +199,7 @@ def boot():
 
     print(f"Booting from `{iso_path}`...")
     command = (f"qemu-system-{build_config["architecture"]} -m {build_config["memory"]}M "
+               f"-bios {build_config["ovmf_path"]} "
                f"-cdrom {iso_path} "
                f"-d cpu_reset  -serial stdio -no-reboot -no-shutdown -s " + build_config["extra_qemu_args"])
 
@@ -222,6 +224,7 @@ def main():
     parser.add_argument("--fix", help="fix lint errors", action='store_true')
     parser.add_argument("-m", "--memory", help="total memory given to the OS", default=128)
     parser.add_argument("-q", "--extra-qemu-args", help="extra arguments for QEMU(should be escaped)")
+    parser.add_argument("-b", "--bios-path", help="path to bios. Default: `/usr/share/ovmf/x64/OVMF.fd`", default="/usr/share/ovmf/x64/OVMF.fd")
 
     args = parser.parse_args()
 
