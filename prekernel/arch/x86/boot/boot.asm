@@ -22,6 +22,14 @@ header_start:
     dd header_end - header_start                                         ; header_length
     dd 0x100000000 - (0xe85250d6 + 0 + (header_end - header_start))      ; checksum
 
+    ; Framebuffer stuff
+    dw 5                                                                 ; Framebuffer Tag
+    dw 0                                                                 ; Flags
+    dd 20                                                                ; Size
+    dd 1024                                                              ; Width
+    dd 768                                                               ; Height
+    dd 32                                                                ; Depth
+
     ; end tag
     dd 0
     dd 0

@@ -20,10 +20,10 @@ use crate::kutils::{KB, MB};
 use crate::{_binary_kernel_bin_end, _binary_kernel_bin_start, serial_print, serial_println};
 use core::arch::asm;
 use core::mem::size_of;
-use core::ptr::addr_of;
+use core::ptr::{addr_of, slice_from_raw_parts, slice_from_raw_parts_mut};
 use core::slice;
 use elf_rs::*;
-use multiboot2::{BootInformation, BootInformationHeader};
+use multiboot2::{BootInformation, BootInformationHeader, FramebufferType};
 use spin::Once;
 
 pub(super) static BOOT_INFO: Once<BootInformation> = Once::new();
@@ -50,8 +50,10 @@ static GDT: [u64; 2] = [0, (1 << 43) | (1 << 44) | (1 << 47) | (1 << 53)];
 #[link_section = ".kernel_content"]
 static mut KERNEL_CONTENT: [u8; 16 * MB] = [0; 16 * MB];
 
+#[inline(never)]
 unsafe fn map_kernel_to_higher_half(kernel_elf: &Elf) {
     let boot_info = BOOT_INFO.get().unwrap();
+    let basic_memory_info = *boot_info.basic_memory_info_tag().unwrap();
 
     serial_println!(
         "Memory size: {}MB",
@@ -123,6 +125,7 @@ unsafe fn map_kernel_to_higher_half(kernel_elf: &Elf) {
     }
 }
 
+#[inline(never)]
 unsafe fn enable_paging() {
     let pml4_addr = (addr_of!(PML4) as *const u64) as u32;
 
@@ -149,6 +152,7 @@ unsafe fn enable_paging() {
     ", in(reg) pml4_addr)
 }
 
+#[inline(never)]
 unsafe fn load_gdt() {
     #[repr(C, packed(2))]
     struct DescriptorTablePointer {
@@ -175,7 +179,9 @@ pub struct KernelContentInfo {
     pub phys_end_addr: u32,
 }
 
+#[inline(never)]
 unsafe fn call_kernel(mb_ptr: u32, kernel_content_info: u32, kernel_addr: u32) {
+    serial_println!("{:x}", kernel_addr);
     asm!(
     "mov edi, {}
     mov esi, {}
@@ -185,13 +191,119 @@ unsafe fn call_kernel(mb_ptr: u32, kernel_content_info: u32, kernel_addr: u32) {
     retf", in(reg) mb_ptr, in(reg) kernel_content_info, in(reg) kernel_addr)
 }
 
+#[inline(never)]
+unsafe fn display_logo() {
+    let boot_info = BOOT_INFO.get().unwrap();
+    let fb_tag = match boot_info
+        .framebuffer_tag()
+        .expect("FerricOxide cannot continue without a framebuffer")
+    {
+        Ok(fb_tag) => fb_tag,
+        Err(e) => panic!("Got an unknown framebuffer type: {e}"),
+    };
+
+    let r;
+    let g;
+    let b;
+
+    match fb_tag.buffer_type() {
+        Ok(fb_type) => match fb_type {
+            FramebufferType::RGB { red, green, blue } => {
+                r = red;
+                g = green;
+                b = blue;
+            }
+            typ => panic!("Unsupported framebuffer type: {:?}", typ),
+        },
+        Err(e) => panic!("Unknown framebuffer type: {e}"),
+    }
+
+    let logo = include_bytes!("../../assets/FerricOxide.tga");
+
+    // The logo is assumed to be a valid TGA file. Hence, there is no validation.
+    #[repr(packed)]
+    struct TGAHeader {
+        _magic1: u8,
+        _colormap: u8,
+        _encoding: u8,
+        _cmaporig: u16,
+        _cmaplen: u16,
+        _cmapent: u8,
+        _x: u16,
+        _y: u16,
+        w: u16,
+        h: u16,
+        bpp: u8,
+        _pixeltype: u8,
+    }
+
+    let header = unsafe { &*(logo.as_ptr() as *const TGAHeader) };
+
+    let img_height = header.h as u32;
+    let img_width = header.w as u32;
+    let img_bpp = header.bpp as u32;
+    let img_pitch = (img_bpp / 8) * img_width;
+
+    let image = unsafe {
+        &*slice_from_raw_parts(
+            (header as *const TGAHeader).offset(1) as *const u8,
+            (img_height * img_width * img_bpp) as usize,
+        )
+    };
+
+    let screen_height = fb_tag.height();
+    let screen_width = fb_tag.width();
+
+    assert!(img_height <= screen_height);
+    assert!(img_width <= screen_width);
+
+    let center_x = screen_width / 2;
+    let center_y = screen_height / 2;
+
+    let logo_x = center_x - (img_width / 2);
+    let logo_y = center_y - (img_height / 2);
+
+    let fb = unsafe {
+        &mut *slice_from_raw_parts_mut(
+            fb_tag.address() as *mut u8,
+            (screen_height * fb_tag.pitch()) as usize,
+        )
+    };
+
+    for y in 0..img_height {
+        for x in 0..img_width {
+            // find the position for pixel on screen
+            let pixel_screen_x = logo_x + x;
+            let pixel_screen_y = logo_y + y;
+
+            // grab the pixel from the image
+            let pixel_pos = (y * img_pitch + x * (img_bpp / 8)) as usize;
+            let pixel_r = image[pixel_pos + 2];
+            let pixel_g = image[pixel_pos + 1];
+            let pixel_b = image[pixel_pos];
+
+            let fb_pixel_pos = ((pixel_screen_y * fb_tag.pitch())
+                + (pixel_screen_x * (fb_tag.bpp() as u32 / 8)))
+                as usize;
+            fb[(r.position / 8) as usize + fb_pixel_pos] = pixel_r;
+            fb[(g.position / 8) as usize + fb_pixel_pos] = pixel_g;
+            fb[(b.position / 8) as usize + fb_pixel_pos] = pixel_b;
+        }
+    }
+}
+
 #[no_mangle]
 pub extern "cdecl" fn prekernel_main(mb_ptr: *const BootInformationHeader) -> ! {
     let mb_info = unsafe { BootInformation::load(mb_ptr).unwrap() };
     BOOT_INFO.call_once(|| mb_info);
 
+    unsafe {
+        display_logo();
+    }
+
     let kernel_start_addr = unsafe { &_binary_kernel_bin_start } as *const u16;
     let kernel_end_addr = unsafe { &_binary_kernel_bin_end } as *const u16;
+    let kernel_size = kernel_end_addr as usize - kernel_start_addr as usize;
 
     serial_println!("Kernel ELF start: {:p}", kernel_start_addr);
     serial_println!("Kernel ELF size: {}KB", kernel_size as f32 / KB as f32);
@@ -220,10 +332,11 @@ pub extern "cdecl" fn prekernel_main(mb_ptr: *const BootInformationHeader) -> ! 
 
     let kernel_content_end = unsafe { &KERNEL_CONTENT[KERNEL_CONTENT.len() - 1] };
     let kernel_content_info = KernelContentInfo {
-        phys_start_addr: addr_of!(unsafe { KERNEL_CONTENT }) as u32,
+        phys_start_addr: unsafe { addr_of!(KERNEL_CONTENT) as u32 },
         phys_end_addr: addr_of!(kernel_content_end) as u32,
     };
 
+    serial_println!("Calling the kernel...");
     unsafe {
         call_kernel(
             // offset shouldn't be big enough to cause issues when casting to 32bit unsigned integer
