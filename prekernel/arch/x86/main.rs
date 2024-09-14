@@ -50,15 +50,8 @@ static GDT: [u64; 2] = [0, (1 << 43) | (1 << 44) | (1 << 47) | (1 << 53)];
 #[link_section = ".kernel_content"]
 static mut KERNEL_CONTENT: [u8; 16 * MB] = [0; 16 * MB];
 
-#[inline(never)]
 unsafe fn map_kernel_to_higher_half(kernel_elf: &Elf) {
     let boot_info = BOOT_INFO.get().unwrap();
-    let basic_memory_info = *boot_info.basic_memory_info_tag().unwrap();
-
-    serial_println!(
-        "Memory size: {}MB",
-        (basic_memory_info.memory_upper() - basic_memory_info.memory_lower()) as f64 / 1024.0
-    );
 
     // 1. Identity map the first 2GB of the address space
     unsafe {
@@ -125,7 +118,6 @@ unsafe fn map_kernel_to_higher_half(kernel_elf: &Elf) {
     }
 }
 
-#[inline(never)]
 unsafe fn enable_paging() {
     let pml4_addr = (addr_of!(PML4) as *const u64) as u32;
 
@@ -152,7 +144,6 @@ unsafe fn enable_paging() {
     ", in(reg) pml4_addr)
 }
 
-#[inline(never)]
 unsafe fn load_gdt() {
     #[repr(C, packed(2))]
     struct DescriptorTablePointer {
@@ -179,9 +170,9 @@ pub struct KernelContentInfo {
     pub phys_end_addr: u32,
 }
 
+// Inlining this function causes fault.
 #[inline(never)]
 unsafe fn call_kernel(mb_ptr: u32, kernel_content_info: u32, kernel_addr: u32) {
-    serial_println!("{:x}", kernel_addr);
     asm!(
     "mov edi, {}
     mov esi, {}
@@ -191,7 +182,6 @@ unsafe fn call_kernel(mb_ptr: u32, kernel_content_info: u32, kernel_addr: u32) {
     retf", in(reg) mb_ptr, in(reg) kernel_content_info, in(reg) kernel_addr)
 }
 
-#[inline(never)]
 unsafe fn display_logo() {
     let boot_info = BOOT_INFO.get().unwrap();
     let fb_tag = match boot_info
@@ -221,6 +211,7 @@ unsafe fn display_logo() {
     let logo = include_bytes!("../../assets/FerricOxide.tga");
 
     // The logo is assumed to be a valid TGA file. Hence, there is no validation.
+    // This is also the reason this function is marked unsafe.
     #[repr(packed)]
     struct TGAHeader {
         _magic1: u8,
@@ -247,7 +238,7 @@ unsafe fn display_logo() {
     let image = unsafe {
         &*slice_from_raw_parts(
             (header as *const TGAHeader).offset(1) as *const u8,
-            (img_height * img_width * img_bpp) as usize,
+            (img_height * img_pitch) as usize,
         )
     };
 

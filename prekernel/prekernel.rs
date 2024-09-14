@@ -33,7 +33,7 @@
 /// - The kernel will never exceed 2GB in size(duh!). Why: the page table setup for higher half kernel
 ///   is done in such a way that it only requires 2 additional PDPT and PDT. This limits the kernel to
 ///   be at most 2GB in size.
-/// - The kernel is at most 8MB in size(for now). Why: the `KERNEL_CONTENT` buffer is 8MB in size. In
+/// - The kernel is at most 16MB in size(for now). Why: the `KERNEL_CONTENT` buffer is 16MB in size. In
 ///   case the kernel exceeds that size, the size of `KERNEL_CONTENT` must be increased to ensure that
 ///   the kernel fits there.
 /// - The kernel is assumed to be a statically linked executable.
