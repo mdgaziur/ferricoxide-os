@@ -5,3 +5,4 @@
 # Build artifacts
 build
 target
+./prekernel/kernel_memsz.rs

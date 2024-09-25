@@ -173,6 +173,23 @@ def turn_kernel_into_binary_object(build_dir: str):
     os.chdir(cur_dir)
 
 
+def determine_kernel_total_memsz():
+    from elftools.elf.elffile import ELFFile
+    from elftools.elf.segments import Segment
+
+    total_size = 0
+    kernel_elf_path = f"build/{build_config["architecture"]}/kernel/kernel.bin"
+    with open(kernel_elf_path, "rb") as kernel_elf:
+        for phdr in ELFFile(kernel_elf).iter_segments():
+            if len(phdr.data()) != 0:
+                total_size += phdr.header['p_memsz']
+
+    kernel_sz_code = (f"// Auto generated code by `b.py`. DO NOT EDIT!\n"
+                      f"pub const KERNEL_CONTENT_TOTAL_MEMSZ: usize = {total_size};")
+
+    with open(f"prekernel/kernel_memsz.rs", 'w') as kernel_memsz_file:
+        kernel_memsz_file.write(kernel_sz_code)
+
 def make_iso():
     print("Making iso...")
     os.makedirs(f"build/{build_config["architecture"]}/iso_tree/boot/grub")
@@ -261,6 +278,7 @@ def main():
 
         build_crate("kernel", build_config["release"], build_dir + "/kernel")
         turn_kernel_into_binary_object(build_dir)
+        determine_kernel_total_memsz()
 
         build_crate("prekernel", build_config["release"], build_dir + "/prekernel")
 

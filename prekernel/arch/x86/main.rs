@@ -16,6 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use crate::kernel_memsz::KERNEL_CONTENT_TOTAL_MEMSZ;
 use crate::kutils::{KB, MB};
 use crate::{_binary_kernel_bin_end, _binary_kernel_bin_start, serial_print, serial_println};
 use core::arch::asm;
@@ -45,14 +46,10 @@ static mut HIGHER_HALF_PDT: [u64; 512] = [0; 512];
 
 static GDT: [u64; 2] = [0, (1 << 43) | (1 << 44) | (1 << 47) | (1 << 53)];
 
-/// Assumes that the kernel never exceeds 16MB in size
-/// NOTE: Bump the size in case kernel exceeds 16MB in size
 #[link_section = ".kernel_content"]
-static mut KERNEL_CONTENT: [u8; 16 * MB] = [0; 16 * MB];
+static mut KERNEL_CONTENT: [u8; KERNEL_CONTENT_TOTAL_MEMSZ] = [0; KERNEL_CONTENT_TOTAL_MEMSZ];
 
 unsafe fn map_kernel_to_higher_half(kernel_elf: &Elf) {
-    let boot_info = BOOT_INFO.get().unwrap();
-
     // 1. Identity map the first 2GB of the address space
     unsafe {
         PML4[0] = (addr_of!(PDPT) as u32 | 0b11) as u64;
@@ -80,7 +77,6 @@ unsafe fn map_kernel_to_higher_half(kernel_elf: &Elf) {
 
     let mut phdr_iter = kernel_elf.program_header_iter();
     let first_phdr = phdr_iter.next().unwrap();
-    let first_phdr_offset = first_phdr.offset() as usize;
     if first_phdr.ph_type() == ProgramType::LOAD {
         map_kernel_from_phdr(0, &first_phdr);
     } else if first_phdr.ph_type() == ProgramType::DYNAMIC {
@@ -109,13 +105,19 @@ unsafe fn map_kernel_to_higher_half(kernel_elf: &Elf) {
         entry_idx += 1;
     }
 
-    for phdr in kernel_elf.program_header_iter() {
+    for phdr in phdr_iter {
         if phdr.ph_type() == ProgramType::LOAD {
-            map_kernel_from_phdr(phdr.offset() as usize - first_phdr_offset, &phdr);
+            map_kernel_from_phdr((phdr.offset() - first_phdr.vaddr()) as usize, &phdr);
         } else if phdr.ph_type() == ProgramType::DYNAMIC {
             panic!("Kernel is somehow a dynamically linked executable!");
         }
     }
+
+    serial_println!(
+        "Kernel size in memory = {} bytes or {} MB",
+        KERNEL_CONTENT.len(),
+        KERNEL_CONTENT.len() as f64 / MB as f64
+    );
 }
 
 unsafe fn enable_paging() {
@@ -323,7 +325,7 @@ pub extern "cdecl" fn prekernel_main(mb_ptr: *const BootInformationHeader) -> ! 
 
     let kernel_content_end = unsafe { &KERNEL_CONTENT[KERNEL_CONTENT.len() - 1] };
     let kernel_content_info = KernelContentInfo {
-        phys_start_addr: unsafe { addr_of!(KERNEL_CONTENT) as u32 },
+        phys_start_addr: addr_of!(KERNEL_CONTENT) as u32,
         phys_end_addr: addr_of!(kernel_content_end) as u32,
     };
 
