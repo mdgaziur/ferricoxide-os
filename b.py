@@ -59,7 +59,7 @@ build_config = {
     "build": False,
     "boot": False,
     "extra_qemu_args": "",
-    "ovmf_path": "/usr/share/ovmf/x64/OVMF.fd",
+    "ovmf_path": "/usr/share/ovmf/x64/OVMF.4m.fd",
 }
 
 
@@ -241,7 +241,7 @@ def main():
     parser.add_argument("--fix", help="fix lint errors", action='store_true')
     parser.add_argument("-m", "--memory", help="total memory given to the OS", default=128)
     parser.add_argument("-q", "--extra-qemu-args", help="extra arguments for QEMU(should be escaped)")
-    parser.add_argument("-b", "--bios-path", help="path to bios. Default: `/usr/share/ovmf/x64/OVMF.fd`", default="/usr/share/ovmf/x64/OVMF.fd")
+    parser.add_argument("-b", "--bios-path", help="path to bios. Default: `/usr/share/ovmf/x64/OVMF.4m.fd`", default="/usr/share/ovmf/x64/OVMF.fd")
 
     args = parser.parse_args()
 
