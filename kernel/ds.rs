@@ -28,27 +28,34 @@
 /// assert!(!bitmap.get(10));
 /// ```
 #[derive(Debug)]
-pub struct StaticBitMap<const S: usize> {
+pub struct StaticBitmap<const S: usize> {
     bit_map: [u64; S],
 }
 
-impl<const S: usize> StaticBitMap<S> {
+impl<const S: usize> StaticBitmap<S> {
     pub const fn new() -> Self {
         Self { bit_map: [0; S] }
     }
 
     pub fn get(&self, index: usize) -> bool {
-        if index >= self.len() {
-            panic!(
+        match self.try_get(index) {
+            Some(bit) => bit,
+            None => panic!(
                 "attempt to access bit at index `{index}` where len is `{}`",
                 self.len()
-            );
+            ),
+        }
+    }
+
+    pub fn try_get(&self, index: usize) -> Option<bool> {
+        if index >= self.len() {
+            return None;
         }
 
         let bitmap_idx = index / 64;
         let bit_idx = index % 64;
 
-        ((self.bit_map[bitmap_idx] >> bit_idx) & 0b11) == 1
+        Some(((self.bit_map[bitmap_idx] >> bit_idx) & 0b1) == 1)
     }
 
     pub fn set(&mut self, index: usize) {
@@ -81,8 +88,31 @@ impl<const S: usize> StaticBitMap<S> {
         *bitmap &= !(1 << bit_idx) as u64;
     }
 
+    pub fn iter(&self) -> StaticBitMapIterator<'_, S> {
+        StaticBitMapIterator {
+            bitmap: self,
+            current_pos: 0,
+        }
+    }
+
     pub fn len(&self) -> usize {
         self.bit_map.len() * 64
+    }
+}
+
+pub struct StaticBitMapIterator<'a, const S: usize> {
+    bitmap: &'a StaticBitmap<S>,
+    current_pos: usize,
+}
+
+impl<const S: usize> Iterator for StaticBitMapIterator<'_, S> {
+    type Item = bool;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let res = self.bitmap.try_get(self.current_pos);
+        self.current_pos += 1;
+
+        res
     }
 }
 

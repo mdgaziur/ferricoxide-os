@@ -1,10 +1,11 @@
-#![feature(panic_info_message)]
 #![feature(naked_functions)]
 #![no_std]
 #![no_main]
 
 mod arch;
+mod ds;
 mod kprintf;
+mod kutils;
 
 use core::arch::asm;
 use core::panic::PanicInfo;

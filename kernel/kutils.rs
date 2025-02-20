@@ -16,8 +16,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-pub const ADDRESS_SPACE_SIZE: usize = 256 * GB;
-pub const KERNEL_STACK_SIZE: usize = 4 * MB;
+pub const ADDRESS_SPACE_SIZE: usize = 512 * GB;
+pub const KERNEL_STACK_SIZE: usize = 4 * KB;
 
 #[allow(unused)]
 pub const GB: usize = MB * 1024;
@@ -48,6 +48,7 @@ macro_rules! verify_called_once {
 #[derive(Debug, Copy, Clone)]
 #[repr(C)]
 pub struct KernelContentInfo {
+    pub virt_start_addr: u64,
     pub phys_start_addr: u32,
     pub phys_end_addr: u32,
 }

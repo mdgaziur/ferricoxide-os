@@ -10,6 +10,16 @@ SECTIONS {
         . = ALIGN(4K);
     }
 
+    .kernel_stack : ALIGN(4K)
+    {
+        *(.kernel_stack)
+    }
+
+    .stackoverflow_guard : ALIGN(4K)
+    {
+        *(.stackoverflow_guard)
+    }
+
     .rodata :
     {
         *(.rodata .rodata.*)

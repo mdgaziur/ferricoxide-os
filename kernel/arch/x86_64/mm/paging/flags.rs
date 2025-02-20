@@ -15,4 +15,18 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
+use bitflags::bitflags;
 
+bitflags! {
+    #[derive(Debug, Copy, Clone)]
+    pub struct PageTableEntryFlags: u64 {
+        const PRESENT = 1 << 0;
+        const WRITABLE = 1 << 1;
+        const USER_ACCESSIBLE = 1 << 2;
+        const WRITE_THROUGH_CACHING = 1 << 3;
+        const DISABLE_CACHE = 1 << 4;
+        const HUGE_PAGE = 1 << 7;
+        const GLOBAL = 1 << 8;
+        const NO_EXECUTE = 1 << 9;
+    }
+}

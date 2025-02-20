@@ -15,74 +15,127 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
+use core::ptr::addr_of;
+use crate::arch::x86_64::mm::frame::{Frame, FrameAllocator};
+use crate::arch::x86_64::{BOOT_INFO, KERNEL_CONTENT_INFO, STACKOVERFLOW_GUARD};
+mod frame;
+pub mod paging;
 
-use crate::arch::x86_64::{BOOT_INFO, KERNEL_CONTENT_INFO};
-use crate::ds::{static_bitmap_size, StaticBitMap};
-use crate::kutils::{ADDRESS_SPACE_SIZE, KB};
-use crate::verify_called_once;
-use multiboot2::MemoryAreaType;
-use spin::Mutex;
+use crate::arch::x86_64::mm::frame::FRAME_ALLOCATOR;
+use crate::arch::x86_64::mm::paging::flags::PageTableEntryFlags;
+use crate::arch::x86_64::mm::paging::{
+    ActivePML4, InactivePML4, Mapper, Page, TemporaryPage, PAGE_SIZE,
+};
 
-const FRAME_SIZE: usize = 4 * KB;
-const FRAME_COUNT: usize = ADDRESS_SPACE_SIZE / FRAME_SIZE;
+pub type PhysAddr = usize;
 
-static FRAME_ALLOCATOR: Mutex<FrameAllocator> = Mutex::new(FrameAllocator::new());
+pub type VirtAddr = usize;
 
-struct FrameAllocator {
-    bit_map: StaticBitMap<{ static_bitmap_size(FRAME_COUNT) }>,
-}
+pub fn mm_init() {
+    FRAME_ALLOCATOR.lock().init();
+    let mut frame_allocator = FRAME_ALLOCATOR.lock();
 
-impl FrameAllocator {
-    pub const fn new() -> Self {
-        FrameAllocator {
-            bit_map: StaticBitMap::new(),
-        }
-    }
+    let mut temporary_page = TemporaryPage::new(Page { number: 69420420 }, &mut *frame_allocator);
 
-    pub fn init(&mut self) {
-        verify_called_once!();
+    let mut active_pml4 = unsafe { ActivePML4::new() };
+    let mut new_table = {
+        let frame = frame_allocator.allocate().expect("OOM: sucks!");
+        InactivePML4::new(frame, &mut active_pml4, &mut temporary_page)
+    };
 
-        let boot_info = BOOT_INFO.get().unwrap();
+    fn map_range(
+        virt_start: usize,
+        phys_start: usize,
+        size: usize,
+        flags: PageTableEntryFlags,
+        mapper: &mut Mapper<'_>,
+        frame_allocator: &mut impl FrameAllocator,
+    ) {
+        assert_eq!(virt_start % PAGE_SIZE, 0);
+        assert_eq!(phys_start % PAGE_SIZE, 0);
 
-        for memory_map in boot_info.memory_map_tag().unwrap().memory_areas() {
-            if memory_map.typ() != MemoryAreaType::Available {
-                self.reserve_area(
-                    memory_map.start_address() as usize,
-                    memory_map.end_address() as usize,
-                );
-            }
-        }
-
-        for elf_section in boot_info.elf_sections().unwrap() {
-            self.reserve_area(
-                elf_section.start_address() as usize,
-                elf_section.end_address() as usize,
+        let size = align_up(size, PAGE_SIZE);
+        let mut n = 0;
+        while n * PAGE_SIZE <= size {
+            mapper.map_to(
+                Page::containing_address(virt_start + n * PAGE_SIZE),
+                Frame::containing_address(phys_start + n * PAGE_SIZE),
+                flags,
+                &mut *frame_allocator,
             );
-        }
 
-        let kernel_content_info = KERNEL_CONTENT_INFO.get().unwrap();
-        self.reserve_area(
-            kernel_content_info.phys_start_addr as usize,
-            kernel_content_info.phys_end_addr as usize,
-        );
+            n += 1;
+        }
     }
 
-    fn reserve_area(&mut self, start: usize, end: usize) {
-        let start = align_down(start, FRAME_SIZE);
-        let mut end = align_up(end, FRAME_SIZE);
+    fn identity_map_range(
+        phys_start: usize,
+        size: usize,
+        flags: PageTableEntryFlags,
+        mapper: &mut Mapper<'_>,
+        frame_allocator: &mut impl FrameAllocator,
+    ) {
+        assert_eq!(phys_start % PAGE_SIZE, 0);
 
-        if start >= ADDRESS_SPACE_SIZE {
-            return;
-        }
-        if end >= ADDRESS_SPACE_SIZE {
-            end = ADDRESS_SPACE_SIZE - 1;
-        }
+        let size = align_up(size, PAGE_SIZE);
+        let mut n = 0;
+        while n * PAGE_SIZE <= size {
+            mapper.identity_map(
+                Frame::containing_address(phys_start + n * PAGE_SIZE),
+                flags,
+                &mut *frame_allocator,
+            );
 
-        let mut cur_addr = start;
-        while cur_addr < end {
-            self.bit_map.set(cur_addr / FRAME_SIZE);
-            cur_addr += FRAME_SIZE;
+            n += 1;
         }
+    }
+    let kernel_content_info = KERNEL_CONTENT_INFO.get().unwrap();
+    let kernel_content_size =
+        (kernel_content_info.phys_end_addr - kernel_content_info.phys_start_addr + 1) as usize;
+    let kernel_start_virt_addr = kernel_content_info.virt_start_addr as usize;
+    let kernel_start_phys_addr = kernel_content_info.phys_start_addr as usize;
+
+    let boot_info = BOOT_INFO.get().unwrap();
+    let boot_info_start_addr = boot_info.start_address();
+    let boot_info_total_size = boot_info.total_size();
+
+    let framebuffer = boot_info.framebuffer_tag().unwrap().unwrap();
+    let framebuffer_address = framebuffer.address() as usize;
+    let framebuffer_size = (framebuffer.height() * framebuffer.pitch()) as usize;
+
+    active_pml4.with(&mut new_table, &mut temporary_page, |mapper| {
+        map_range(
+            kernel_start_virt_addr,
+            kernel_start_phys_addr,
+            kernel_content_size,
+            PageTableEntryFlags::PRESENT,
+            mapper,
+            &mut *frame_allocator,
+        );
+
+        identity_map_range(
+            boot_info_start_addr,
+            boot_info_total_size,
+            PageTableEntryFlags::PRESENT | PageTableEntryFlags::NO_EXECUTE,
+            mapper,
+            &mut *frame_allocator,
+        );
+
+        identity_map_range(
+            framebuffer_address,
+            framebuffer_size,
+            PageTableEntryFlags::PRESENT | PageTableEntryFlags::NO_EXECUTE,
+            mapper,
+            &mut *frame_allocator,
+        );
+    });
+
+    unsafe {
+        active_pml4.switch(new_table);
+        active_pml4.unmap(
+            Page::containing_address(addr_of!(STACKOVERFLOW_GUARD) as usize),
+            &mut *frame_allocator
+        );
     }
 }
 
@@ -92,8 +145,4 @@ fn align_up(addr: usize, alignment: usize) -> usize {
 
 fn align_down(addr: usize, alignment: usize) -> usize {
     addr & !(alignment - 1)
-}
-
-pub fn mm_init() {
-    FRAME_ALLOCATOR.lock().init();
 }
