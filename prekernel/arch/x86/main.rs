@@ -49,7 +49,8 @@ static GDT: [u64; 2] = [0, (1 << 43) | (1 << 44) | (1 << 47) | (1 << 53)];
 #[link_section = ".kernel_content"]
 static mut KERNEL_CONTENT: [u8; KERNEL_CONTENT_TOTAL_MEMSZ] = [0; KERNEL_CONTENT_TOTAL_MEMSZ];
 
-unsafe fn map_kernel_to_higher_half(kernel_elf: &Elf) {
+/// Maps the kernel to higher half and returns the starting virtual address
+unsafe fn map_kernel_to_higher_half(kernel_elf: &Elf) -> u64 {
     // 1. Identity map the first 2GB of the address space
     unsafe {
         PML4[0] = (addr_of!(PDPT) as u32 | 0b11) as u64;
@@ -113,11 +114,15 @@ unsafe fn map_kernel_to_higher_half(kernel_elf: &Elf) {
         }
     }
 
+    PML4[510] = addr_of!(PML4) as u64 | 0b11;
+
     serial_println!(
         "Kernel size in memory = {} bytes or {} MB",
         KERNEL_CONTENT.len(),
         KERNEL_CONTENT.len() as f64 / MB as f64
     );
+
+    first_phdr.vaddr()
 }
 
 unsafe fn enable_paging() {
@@ -168,6 +173,7 @@ unsafe fn load_gdt() {
 #[derive(Debug, Copy, Clone)]
 #[repr(C)]
 pub struct KernelContentInfo {
+    pub virt_start_addr: u64,
     pub phys_start_addr: u32,
     pub phys_end_addr: u32,
 }
@@ -310,8 +316,9 @@ pub extern "cdecl" fn prekernel_main(mb_ptr: *const BootInformationHeader) -> ! 
 
     let kernel_elf = Elf::from_bytes(kernel).unwrap();
 
+    let kernel_higher_half_start_addr;
     unsafe {
-        map_kernel_to_higher_half(&kernel_elf);
+        kernel_higher_half_start_addr = map_kernel_to_higher_half(&kernel_elf);
         enable_paging();
         load_gdt();
     }
@@ -323,11 +330,16 @@ pub extern "cdecl" fn prekernel_main(mb_ptr: *const BootInformationHeader) -> ! 
     }
     serial_println!();
 
-    let kernel_content_end = unsafe { &KERNEL_CONTENT[KERNEL_CONTENT.len() - 1] };
-    let kernel_content_info = KernelContentInfo {
-        phys_start_addr: addr_of!(KERNEL_CONTENT) as u32,
-        phys_end_addr: addr_of!(kernel_content_end) as u32,
-    };
+    let kernel_content_info;
+    unsafe {
+        let kernel_content_start = addr_of!(KERNEL_CONTENT) as u32;
+        let kernel_content_end = kernel_content_start + KERNEL_CONTENT.len() as u32 - 1;
+        kernel_content_info = KernelContentInfo {
+            virt_start_addr: kernel_higher_half_start_addr,
+            phys_start_addr: kernel_content_start,
+            phys_end_addr: kernel_content_end,
+        };
+    }
 
     serial_println!("Calling the kernel...");
     unsafe {
