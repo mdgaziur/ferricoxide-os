@@ -257,13 +257,16 @@ def main():
     build_config["release"] = args.release
     build_config["extra_qemu_args"] = args.extra_qemu_args if args.extra_qemu_args else ""
 
+
+    if build_config["fix"]:
+        fix_code("prekernel")
+        fix_code("kernel")
+
     if build_config["reformat"]:
         reformat_code("prekernel")
         reformat_code("kernel")
-        return
-    elif build_config["fix"]:
-        fix_code("prekernel")
-        fix_code("kernel")
+
+    if build_config["fix"] or build_config["reformat"]:
         return
 
     if build_config["build"]:
