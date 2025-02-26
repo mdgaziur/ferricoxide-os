@@ -18,7 +18,7 @@
 use crate::arch::x86_64::cpu::{flush_tlb, flush_tlb_all, read_cr3, write_cr3};
 use crate::arch::x86_64::mm::frame::{Frame, FrameAllocator, FRAME_SIZE};
 use crate::arch::x86_64::mm::paging::flags::PageTableEntryFlags;
-use crate::arch::x86_64::mm::{PhysAddr, VirtAddr};
+use crate::arch::x86_64::mm::{align_up, PhysAddr, VirtAddr};
 use core::fmt::{Debug, Formatter};
 use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut, Index, IndexMut};
@@ -572,4 +572,79 @@ impl Page {
     fn pt_index(&self) -> usize {
         self.number & 0o777
     }
+}
+
+pub fn map_range(
+    virt_start: usize,
+    phys_start: usize,
+    size: usize,
+    flags: PageTableEntryFlags,
+    mapper: &mut Mapper<'_>,
+    frame_allocator: &mut impl FrameAllocator,
+) -> usize {
+    assert_eq!(virt_start % PAGE_SIZE, 0);
+    assert_eq!(phys_start % PAGE_SIZE, 0);
+
+    let size = align_up(size, PAGE_SIZE);
+    let mut n = 0;
+    while n * PAGE_SIZE <= size {
+        mapper.map_to(
+            Page::containing_address(virt_start + n * PAGE_SIZE),
+            Frame::containing_address(phys_start + n * PAGE_SIZE),
+            flags,
+            &mut *frame_allocator,
+        );
+
+        n += 1;
+    }
+
+    n * PAGE_SIZE
+}
+
+pub fn map_virtual_range(
+    virt_start: usize,
+    size: usize,
+    flags: PageTableEntryFlags,
+    mapper: &mut Mapper<'_>,
+    frame_allocator: &mut impl FrameAllocator,
+) -> usize {
+    assert_eq!(virt_start % PAGE_SIZE, 0);
+
+    let size = align_up(size, PAGE_SIZE);
+    let mut n = 0;
+    while n * PAGE_SIZE <= size {
+        mapper.map(
+            Page::containing_address(virt_start + n * PAGE_SIZE),
+            flags,
+            &mut *frame_allocator,
+        );
+
+        n += 1;
+    }
+
+    n * PAGE_SIZE
+}
+
+pub fn identity_map_range(
+    phys_start: usize,
+    size: usize,
+    flags: PageTableEntryFlags,
+    mapper: &mut Mapper<'_>,
+    frame_allocator: &mut impl FrameAllocator,
+) -> usize {
+    assert_eq!(phys_start % PAGE_SIZE, 0);
+
+    let size = align_up(size, PAGE_SIZE);
+    let mut n = 0;
+    while n * PAGE_SIZE <= size {
+        mapper.identity_map(
+            Frame::containing_address(phys_start + n * PAGE_SIZE),
+            flags,
+            &mut *frame_allocator,
+        );
+
+        n += 1;
+    }
+
+    n * PAGE_SIZE
 }

@@ -18,9 +18,9 @@
 use crate::arch::x86_64::mm::PhysAddr;
 use crate::arch::x86_64::{mm, BOOT_INFO, KERNEL_CONTENT_INFO};
 use crate::ds::{static_bitmap_size, StaticBitmap};
-use crate::kutils::{ADDRESS_SPACE_SIZE, KB};
+use crate::kutils::{ADDRESS_SPACE_SIZE, KB, MB};
 use crate::{serial_println, verify_called_once};
-use multiboot2::MemoryAreaType;
+use multiboot2::{MemoryArea, MemoryAreaType};
 use spin::Mutex;
 
 pub const FRAME_SIZE: usize = 4 * KB;
@@ -30,12 +30,16 @@ pub static FRAME_ALLOCATOR: Mutex<BitmapFrameAllocator> = Mutex::new(BitmapFrame
 
 pub struct BitmapFrameAllocator {
     bit_map: StaticBitmap<{ static_bitmap_size(FRAME_COUNT) }>,
+    total_memory: usize,
+    available_memory: usize,
 }
 
 impl BitmapFrameAllocator {
     pub const fn new() -> Self {
         BitmapFrameAllocator {
             bit_map: StaticBitmap::new(),
+            total_memory: 0,
+            available_memory: 0,
         }
     }
 
@@ -43,8 +47,19 @@ impl BitmapFrameAllocator {
         verify_called_once!();
 
         let boot_info = BOOT_INFO.get().unwrap();
+        let mut total_memory = 0;
+        let mut unavailable_memory = 0;
+
+        // reserve the first 1MiB area to avoid weird corruptions
+        self.reserve_area(0x00000000, 1 * MB);
 
         self.reserve_area(boot_info.start_address(), boot_info.end_address());
+
+        let framebuffer_tag = boot_info.framebuffer_tag().unwrap().unwrap();
+        self.reserve_area(
+            framebuffer_tag.address() as usize,
+            (framebuffer_tag.height() * framebuffer_tag.pitch()) as usize,
+        );
 
         for memory_map in boot_info.memory_map_tag().unwrap().memory_areas() {
             if memory_map.typ() != MemoryAreaType::Available {
@@ -53,12 +68,14 @@ impl BitmapFrameAllocator {
                     memory_map.start_address() as usize,
                     memory_map.end_address() as usize,
                 );
+            } else {
+                total_memory += memory_map.size() as usize;
             }
         }
 
         for elf_section in boot_info.elf_sections_tag().unwrap().sections() {
             serial_println!("Reserving elf section: {:?}", elf_section);
-            self.reserve_area(
+            unavailable_memory += self.reserve_area(
                 elf_section.start_address() as usize,
                 elf_section.end_address() as usize,
             );
@@ -66,18 +83,21 @@ impl BitmapFrameAllocator {
 
         let kernel_content_info = KERNEL_CONTENT_INFO.get().unwrap();
         serial_println!("Reserving kernel content: {:?}", kernel_content_info);
-        self.reserve_area(
+        unavailable_memory += self.reserve_area(
             kernel_content_info.phys_start_addr as usize,
             kernel_content_info.phys_end_addr as usize,
         );
+
+        self.total_memory = total_memory;
+        self.available_memory = self.total_memory - unavailable_memory;
     }
 
-    fn reserve_area(&mut self, start: usize, end: usize) {
+    fn reserve_area(&mut self, start: usize, end: usize) -> usize {
         let start = mm::align_down(start, FRAME_SIZE);
         let mut end = mm::align_up(end, FRAME_SIZE);
 
         if start >= ADDRESS_SPACE_SIZE {
-            return;
+            return 0;
         }
         if end >= ADDRESS_SPACE_SIZE {
             end = ADDRESS_SPACE_SIZE - 1;
@@ -88,12 +108,25 @@ impl BitmapFrameAllocator {
             self.bit_map.set(cur_addr / FRAME_SIZE);
             cur_addr += FRAME_SIZE;
         }
+
+        (end - start) + 1
+    }
+
+    pub fn total_memory(&self) -> usize {
+        self.total_memory
+    }
+
+    pub fn available_memory(&self) -> usize {
+        self.available_memory
     }
 }
 
 impl FrameAllocator for BitmapFrameAllocator {
     /// Finds a free frame and returns a `Frame` containing the frame index
     fn allocate(&mut self) -> Option<Frame> {
+        if self.available_memory < FRAME_SIZE {
+            return None;
+        }
         let mut res_frame = None;
 
         for (idx, bit) in self.bit_map.iter().enumerate() {
@@ -107,15 +140,22 @@ impl FrameAllocator for BitmapFrameAllocator {
             self.bit_map.set(frame.number);
         }
 
+        self.available_memory -= FRAME_SIZE;
         res_frame
     }
 
     /// Marks given frame as free to be reused by a subsequent allocation.
     ///
     /// # SAFETY
-    /// *Must* ensure that the given frame is no longer in use.
+    /// *Must* ensure that the given frame is no longer in use. Also, it should be made sure
+    /// that the frame does not point to a reserved memory.
     unsafe fn deallocate(&mut self, frame: Frame) {
+        if !self.bit_map.get(frame.number) {
+            panic!("attempt to free an unused frame: {:?}", frame);
+        }
+
         self.bit_map.clear(frame.number);
+        self.available_memory += FRAME_SIZE;
     }
 }
 

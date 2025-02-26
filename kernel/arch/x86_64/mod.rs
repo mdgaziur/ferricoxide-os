@@ -20,11 +20,11 @@ mod cpu;
 mod mm;
 
 use crate::arch::x86_64::mm::mm_init;
-use crate::ds::{static_bitmap_size, StaticBitmap};
 use crate::kutils::{KernelContentInfo, KERNEL_STACK_SIZE};
-use crate::{dbg, serial_println};
+use crate::serial_println;
 use core::arch::asm;
 use core::ptr::addr_of;
+use core::slice;
 use multiboot2::{BootInformation, BootInformationHeader};
 use spin::Once;
 
@@ -97,15 +97,6 @@ fn actually_kernel_start(
     serial_println!("KERNEL_STACK end: {:p}", KERNEL_STACK_TOP);
 
     mm_init();
-
-    let mut static_bitmap = StaticBitmap::<{ static_bitmap_size(5) }>::new();
-    static_bitmap.set(0);
-    static_bitmap.set(3);
-    dbg!(
-        static_bitmap.get(0),
-        static_bitmap.get(3),
-        static_bitmap.get(1)
-    );
 
     loop {
         unsafe {

@@ -1,6 +1,7 @@
 #![feature(naked_functions)]
 #![no_std]
 #![no_main]
+extern crate alloc;
 
 mod arch;
 mod ds;

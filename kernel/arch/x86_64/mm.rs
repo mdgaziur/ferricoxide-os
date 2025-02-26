@@ -15,26 +15,40 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-use core::ptr::addr_of;
 use crate::arch::x86_64::mm::frame::{Frame, FrameAllocator};
 use crate::arch::x86_64::{BOOT_INFO, KERNEL_CONTENT_INFO, STACKOVERFLOW_GUARD};
+use alloc::string::String;
+use alloc::vec;
+use core::cmp::max;
+use core::ptr::addr_of;
 mod frame;
 pub mod paging;
 
 use crate::arch::x86_64::mm::frame::FRAME_ALLOCATOR;
 use crate::arch::x86_64::mm::paging::flags::PageTableEntryFlags;
 use crate::arch::x86_64::mm::paging::{
-    ActivePML4, InactivePML4, Mapper, Page, TemporaryPage, PAGE_SIZE,
+    identity_map_range, map_range, map_virtual_range, ActivePML4, InactivePML4, Mapper, Page,
+    TemporaryPage, PAGE_SIZE,
 };
+use crate::kutils::MB;
+use crate::{dbg, serial_println};
+use linked_list_allocator::LockedHeap;
+use spin::Once;
 
 pub type PhysAddr = usize;
 
 pub type VirtAddr = usize;
 
+#[global_allocator]
+static KERNEL_HEAP_ALLOCATOR: LockedHeap = LockedHeap::empty();
+const KERNEL_HEAP_SIZE: usize = 16 * MB;
+
+static ACTIVE_PML4: Once<ActivePML4> = Once::new();
+
 pub fn mm_init() {
     FRAME_ALLOCATOR.lock().init();
-    let mut frame_allocator = FRAME_ALLOCATOR.lock();
 
+    let mut frame_allocator = FRAME_ALLOCATOR.lock();
     let mut temporary_page = TemporaryPage::new(Page { number: 69420420 }, &mut *frame_allocator);
 
     let mut active_pml4 = unsafe { ActivePML4::new() };
@@ -43,52 +57,6 @@ pub fn mm_init() {
         InactivePML4::new(frame, &mut active_pml4, &mut temporary_page)
     };
 
-    fn map_range(
-        virt_start: usize,
-        phys_start: usize,
-        size: usize,
-        flags: PageTableEntryFlags,
-        mapper: &mut Mapper<'_>,
-        frame_allocator: &mut impl FrameAllocator,
-    ) {
-        assert_eq!(virt_start % PAGE_SIZE, 0);
-        assert_eq!(phys_start % PAGE_SIZE, 0);
-
-        let size = align_up(size, PAGE_SIZE);
-        let mut n = 0;
-        while n * PAGE_SIZE <= size {
-            mapper.map_to(
-                Page::containing_address(virt_start + n * PAGE_SIZE),
-                Frame::containing_address(phys_start + n * PAGE_SIZE),
-                flags,
-                &mut *frame_allocator,
-            );
-
-            n += 1;
-        }
-    }
-
-    fn identity_map_range(
-        phys_start: usize,
-        size: usize,
-        flags: PageTableEntryFlags,
-        mapper: &mut Mapper<'_>,
-        frame_allocator: &mut impl FrameAllocator,
-    ) {
-        assert_eq!(phys_start % PAGE_SIZE, 0);
-
-        let size = align_up(size, PAGE_SIZE);
-        let mut n = 0;
-        while n * PAGE_SIZE <= size {
-            mapper.identity_map(
-                Frame::containing_address(phys_start + n * PAGE_SIZE),
-                flags,
-                &mut *frame_allocator,
-            );
-
-            n += 1;
-        }
-    }
     let kernel_content_info = KERNEL_CONTENT_INFO.get().unwrap();
     let kernel_content_size =
         (kernel_content_info.phys_end_addr - kernel_content_info.phys_start_addr + 1) as usize;
@@ -102,9 +70,10 @@ pub fn mm_init() {
     let framebuffer = boot_info.framebuffer_tag().unwrap().unwrap();
     let framebuffer_address = framebuffer.address() as usize;
     let framebuffer_size = (framebuffer.height() * framebuffer.pitch()) as usize;
+    let mut heap_addr = 0;
 
     active_pml4.with(&mut new_table, &mut temporary_page, |mapper| {
-        map_range(
+        let kernel_end = map_range(
             kernel_start_virt_addr,
             kernel_start_phys_addr,
             kernel_content_size,
@@ -113,7 +82,7 @@ pub fn mm_init() {
             &mut *frame_allocator,
         );
 
-        identity_map_range(
+        let boot_info_end = identity_map_range(
             boot_info_start_addr,
             boot_info_total_size,
             PageTableEntryFlags::PRESENT | PageTableEntryFlags::NO_EXECUTE,
@@ -121,22 +90,55 @@ pub fn mm_init() {
             &mut *frame_allocator,
         );
 
-        identity_map_range(
+        let framebuffer_end = identity_map_range(
             framebuffer_address,
             framebuffer_size,
             PageTableEntryFlags::PRESENT | PageTableEntryFlags::NO_EXECUTE,
             mapper,
             &mut *frame_allocator,
         );
+        // just in case something ends up after the kernel content(somehow!)
+        heap_addr = max(kernel_end, max(boot_info_end, framebuffer_end));
     });
 
     unsafe {
         active_pml4.switch(new_table);
         active_pml4.unmap(
             Page::containing_address(addr_of!(STACKOVERFLOW_GUARD) as usize),
-            &mut *frame_allocator
+            &mut *frame_allocator,
         );
     }
+
+    map_virtual_range(
+        heap_addr,
+        KERNEL_HEAP_SIZE,
+        PageTableEntryFlags::empty(),
+        &mut active_pml4.mapper,
+        &mut *frame_allocator,
+    );
+
+    // SAFETY:
+    // The 64MB area is frame allocated and mapped into proper address
+    unsafe {
+        KERNEL_HEAP_ALLOCATOR
+            .lock()
+            .init(heap_addr as *mut u8, KERNEL_HEAP_SIZE);
+    }
+
+    ACTIVE_PML4.call_once(|| {
+        active_pml4
+    });
+
+    serial_println!(
+        "Total memory: {} MB",
+        frame_allocator.total_memory() as f64 / MB as f64
+    );
+    serial_println!(
+        "Available memory: {} MB",
+        frame_allocator.available_memory() as f64 / MB as f64
+    );
+    serial_println!("Kernel heap size: {} MB", KERNEL_HEAP_SIZE as f64 / MB as f64);
+    serial_println!("Free kernel heap: {} MB", KERNEL_HEAP_ALLOCATOR.lock().free() as f64 / MB as f64);
 }
 
 fn align_up(addr: usize, alignment: usize) -> usize {
