@@ -16,9 +16,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 use crate::arch::x86_64::cpu::{flush_tlb, flush_tlb_all, read_cr3, write_cr3};
-use crate::arch::x86_64::mm::frame::{Frame, FrameAllocator, FRAME_SIZE};
+use crate::arch::x86_64::mm::frame::{FRAME_SIZE, Frame, FrameAllocator};
 use crate::arch::x86_64::mm::paging::flags::PageTableEntryFlags;
-use crate::arch::x86_64::mm::{align_up, PhysAddr, VirtAddr};
+use crate::arch::x86_64::mm::{PhysAddr, VirtAddr, align_up};
 use core::fmt::{Debug, Formatter};
 use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut, Index, IndexMut};
@@ -36,8 +36,10 @@ impl<'a> ActivePML4<'a> {
     /// # SAFETY
     /// There must always be only one instance of this
     pub unsafe fn new() -> Self {
-        Self {
-            mapper: Mapper::new(),
+        unsafe {
+            Self {
+                mapper: Mapper::new(),
+            }
         }
     }
 
@@ -69,12 +71,14 @@ impl<'a> ActivePML4<'a> {
     }
 
     pub unsafe fn switch(&mut self, new_table: InactivePML4) -> InactivePML4 {
-        let old_table = InactivePML4 {
-            pml4_frame: Frame::containing_address(read_cr3() as PhysAddr),
-        };
+        unsafe {
+            let old_table = InactivePML4 {
+                pml4_frame: Frame::containing_address(read_cr3() as PhysAddr),
+            };
 
-        write_cr3(new_table.pml4_frame.start_address() as u64);
-        old_table
+            write_cr3(new_table.pml4_frame.start_address() as u64);
+            old_table
+        }
     }
 }
 
@@ -191,20 +195,22 @@ impl<'a> Mapper<'a> {
     }
 
     pub unsafe fn unmap(&mut self, page: Page, frame_allocator: &mut impl FrameAllocator) {
-        assert!(self.translate(page.start_address()).is_some());
+        unsafe {
+            assert!(self.translate(page.start_address()).is_some());
 
-        let pt = self
-            .pml4
-            .next_table_mut(page.pml4_index())
-            .and_then(|pdpt| pdpt.next_table_mut(page.pdpt_index()))
-            .and_then(|pdt| pdt.next_table_mut(page.pdt_index()))
-            .expect("TODO: huge page");
+            let pt = self
+                .pml4
+                .next_table_mut(page.pml4_index())
+                .and_then(|pdpt| pdpt.next_table_mut(page.pdpt_index()))
+                .and_then(|pdt| pdt.next_table_mut(page.pdt_index()))
+                .expect("TODO: huge page");
 
-        let frame = pt[page.pt_index()].pointed_frame().unwrap();
-        pt[page.pt_index()].set_unused();
+            let frame = pt[page.pt_index()].pointed_frame().unwrap();
+            pt[page.pt_index()].set_unused();
 
-        frame_allocator.deallocate(frame);
-        flush_tlb(page.start_address());
+            frame_allocator.deallocate(frame);
+            flush_tlb(page.start_address());
+        }
     }
 }
 

@@ -29,10 +29,12 @@ pub fn flush_tlb_all() {
 }
 
 pub unsafe fn read_cr3() -> u64 {
-    let mut value: u64;
-    asm!("mov {}, cr3", out(reg) value, options(nostack, preserves_flags));
+    unsafe {
+        let mut value: u64;
+        asm!("mov {}, cr3", out(reg) value, options(nostack, preserves_flags));
 
-    value
+        value
+    }
 }
 
 pub fn write_cr3(value: u64) {

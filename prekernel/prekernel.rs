@@ -43,7 +43,7 @@ mod kutils;
 
 use core::panic::PanicInfo;
 
-extern "C" {
+unsafe extern "C" {
     static _binary_kernel_bin_start: u16;
 
     static _binary_kernel_bin_end: u16;

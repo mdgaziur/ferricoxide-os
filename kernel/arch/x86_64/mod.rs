@@ -20,32 +20,32 @@ mod cpu;
 mod mm;
 
 use crate::arch::x86_64::mm::mm_init;
-use crate::kutils::{KernelContentInfo, KERNEL_STACK_SIZE};
+use crate::kutils::{KERNEL_STACK_SIZE, KernelContentInfo};
 use crate::serial_println;
-use core::arch::asm;
+use core::arch::{asm, naked_asm};
 use core::ptr::addr_of;
-use core::slice;
 use multiboot2::{BootInformation, BootInformationHeader};
 use spin::Once;
 
 pub(super) static BOOT_INFO: Once<BootInformation> = Once::new();
 pub(super) static KERNEL_CONTENT_INFO: Once<KernelContentInfo> = Once::new();
 
-#[link_section = ".kernel_stack"]
+#[unsafe(link_section = ".kernel_stack")]
 static KERNEL_STACK: [u8; KERNEL_STACK_SIZE] = [0; KERNEL_STACK_SIZE];
 
 #[allow(dead_code)]
-#[link_section = ".stackoverflow_guard"]
+#[unsafe(link_section = ".stackoverflow_guard")]
 static STACKOVERFLOW_GUARD: [u8; 4096] = [0; 4096];
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 static KERNEL_STACK_TOP: &u8 = &KERNEL_STACK[KERNEL_STACK.len() - 1];
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[naked]
 unsafe extern "C" fn kernel_start() {
-    asm!(
-        "mov ax, 0
+    unsafe {
+        naked_asm!(
+            "mov ax, 0
         mov ss, ax
         mov ds, ax
         mov es, ax
@@ -69,12 +69,12 @@ unsafe extern "C" fn kernel_start() {
         // so that gdb can point out which part of the kernel we are executing
         lea rax, [actually_kernel_start]
         push rax
-        ret",
-        options(noreturn)
-    );
+        ret"
+        );
+    }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 fn actually_kernel_start(
     boot_information_header: *const BootInformationHeader,
     kernel_content_info: *const KernelContentInfo,

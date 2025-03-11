@@ -30,19 +30,17 @@ pub const KB: usize = 1024;
 
 #[macro_export]
 macro_rules! verify_called_once {
-    () => {
-        {
-            use spin::Once;
-            static HAS_BEEN_CALLED: Once<bool> = Once::new();
-            if HAS_BEEN_CALLED.get().is_some() {
-                panic!("Attempt to call a function that was supposed to call only once more than one time!");
-            } else {
-                HAS_BEEN_CALLED.call_once(|| {
-                    true
-                });
-            }
+    () => {{
+        use spin::Once;
+        static HAS_BEEN_CALLED: Once<bool> = Once::new();
+        if HAS_BEEN_CALLED.get().is_some() {
+            panic!(
+                "Attempt to call a function that was supposed to call only once more than one time!"
+            );
+        } else {
+            HAS_BEEN_CALLED.call_once(|| true);
         }
-    };
+    }};
 }
 
 #[derive(Debug, Copy, Clone)]

@@ -16,11 +16,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 use crate::arch::x86_64::mm::PhysAddr;
-use crate::arch::x86_64::{mm, BOOT_INFO, KERNEL_CONTENT_INFO};
-use crate::ds::{static_bitmap_size, StaticBitmap};
+use crate::arch::x86_64::{BOOT_INFO, KERNEL_CONTENT_INFO, mm};
+use crate::ds::{StaticBitmap, static_bitmap_size};
 use crate::kutils::{ADDRESS_SPACE_SIZE, KB, MB};
 use crate::{serial_println, verify_called_once};
-use multiboot2::{MemoryArea, MemoryAreaType};
+use multiboot2::MemoryAreaType;
 use spin::Mutex;
 
 pub const FRAME_SIZE: usize = 4 * KB;
@@ -51,7 +51,7 @@ impl BitmapFrameAllocator {
         let mut unavailable_memory = 0;
 
         // reserve the first 1MiB area to avoid weird corruptions
-        self.reserve_area(0x00000000, 1 * MB);
+        self.reserve_area(0x00000000, MB);
 
         self.reserve_area(boot_info.start_address(), boot_info.end_address());
 

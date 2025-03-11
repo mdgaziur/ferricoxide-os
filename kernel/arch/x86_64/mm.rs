@@ -15,10 +15,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-use crate::arch::x86_64::mm::frame::{Frame, FrameAllocator};
+use crate::arch::x86_64::mm::frame::FrameAllocator;
 use crate::arch::x86_64::{BOOT_INFO, KERNEL_CONTENT_INFO, STACKOVERFLOW_GUARD};
-use alloc::string::String;
-use alloc::vec;
 use core::cmp::max;
 use core::ptr::addr_of;
 mod frame;
@@ -27,11 +25,10 @@ pub mod paging;
 use crate::arch::x86_64::mm::frame::FRAME_ALLOCATOR;
 use crate::arch::x86_64::mm::paging::flags::PageTableEntryFlags;
 use crate::arch::x86_64::mm::paging::{
-    identity_map_range, map_range, map_virtual_range, ActivePML4, InactivePML4, Mapper, Page,
-    TemporaryPage, PAGE_SIZE,
+    ActivePML4, InactivePML4, Page, TemporaryPage, identity_map_range, map_range, map_virtual_range,
 };
 use crate::kutils::MB;
-use crate::{dbg, serial_println};
+use crate::serial_println;
 use linked_list_allocator::LockedHeap;
 use spin::Once;
 
@@ -125,9 +122,7 @@ pub fn mm_init() {
             .init(heap_addr as *mut u8, KERNEL_HEAP_SIZE);
     }
 
-    ACTIVE_PML4.call_once(|| {
-        active_pml4
-    });
+    ACTIVE_PML4.call_once(|| active_pml4);
 
     serial_println!(
         "Total memory: {} MB",
@@ -137,8 +132,14 @@ pub fn mm_init() {
         "Available memory: {} MB",
         frame_allocator.available_memory() as f64 / MB as f64
     );
-    serial_println!("Kernel heap size: {} MB", KERNEL_HEAP_SIZE as f64 / MB as f64);
-    serial_println!("Free kernel heap: {} MB", KERNEL_HEAP_ALLOCATOR.lock().free() as f64 / MB as f64);
+    serial_println!(
+        "Kernel heap size: {} MB",
+        KERNEL_HEAP_SIZE as f64 / MB as f64
+    );
+    serial_println!(
+        "Free kernel heap: {} MB",
+        KERNEL_HEAP_ALLOCATOR.lock().free() as f64 / MB as f64
+    );
 }
 
 fn align_up(addr: usize, alignment: usize) -> usize {

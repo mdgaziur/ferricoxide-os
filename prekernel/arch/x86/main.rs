@@ -15,7 +15,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 use crate::kernel_memsz::KERNEL_CONTENT_TOTAL_MEMSZ;
 use crate::kutils::{KB, MB};
 use crate::{_binary_kernel_bin_end, _binary_kernel_bin_start, serial_print, serial_println};
@@ -29,24 +28,24 @@ use spin::Once;
 
 pub(super) static BOOT_INFO: Once<BootInformation> = Once::new();
 
-#[link_section = ".pml4"]
+#[unsafe(link_section = ".pml4")]
 static mut PML4: [u64; 512] = [0; 512];
 
-#[link_section = ".pdpt"]
+#[unsafe(link_section = ".pdpt")]
 static mut PDPT: [u64; 512] = [0; 512];
 
-#[link_section = ".pdt"]
+#[unsafe(link_section = ".pdt")]
 static mut PDT: [u64; 512] = [0; 512];
 
-#[link_section = ".higher_half_pdpt"]
+#[unsafe(link_section = ".higher_half_pdpt")]
 static mut HIGHER_HALF_PDPT: [u64; 512] = [0; 512];
 
-#[link_section = ".higher_half_pdt"]
+#[unsafe(link_section = ".higher_half_pdt")]
 static mut HIGHER_HALF_PDT: [u64; 512] = [0; 512];
 
 static GDT: [u64; 2] = [0, (1 << 43) | (1 << 44) | (1 << 47) | (1 << 53)];
 
-#[link_section = ".kernel_content"]
+#[unsafe(link_section = ".kernel_content")]
 static mut KERNEL_CONTENT: [u8; KERNEL_CONTENT_TOTAL_MEMSZ] = [0; KERNEL_CONTENT_TOTAL_MEMSZ];
 
 /// Maps the kernel to higher half and returns the starting virtual address
@@ -56,79 +55,86 @@ unsafe fn map_kernel_to_higher_half(kernel_elf: &Elf) -> u64 {
         PML4[0] = (addr_of!(PDPT) as u32 | 0b11) as u64;
         PDPT[0] = (addr_of!(PDT) as u32 | 0b11) as u64;
 
+        #[allow(static_mut_refs)]
         for (entry_idx, pdt_entry) in PDT.iter_mut().enumerate() {
             let entry = (0x200000 * entry_idx) | 0b10000011;
             *pdt_entry = entry as u64;
         }
-    }
 
-    // 2. Map the kernel using 2MB pages to keep the paging structure simple.
-    unsafe fn map_kernel_from_phdr(offset: usize, phdr: &ProgramHeaderEntry) {
-        let Some(phdr_content) = phdr.content() else {
-            serial_println!(
-                "Skipping program header because it has no content: {:?}",
-                phdr
-            );
-            return;
-        };
+        // 2. Map the kernel using 2MB pages to keep the paging structure simple.
+        unsafe fn map_kernel_from_phdr(offset: usize, phdr: &ProgramHeaderEntry) {
+            unsafe {
+                let Some(phdr_content) = phdr.content() else {
+                    serial_println!(
+                        "Skipping program header because it has no content: {:?}",
+                        phdr
+                    );
+                    return;
+                };
 
-        KERNEL_CONTENT[offset..(phdr.filesz() as usize - 1)]
-            .copy_from_slice(&phdr_content[..((phdr.filesz() as usize - 1) - offset)]);
-    }
+                KERNEL_CONTENT[offset..(phdr.filesz() as usize - 1)]
+                    .copy_from_slice(&phdr_content[..((phdr.filesz() as usize - 1) - offset)]);
+            }
+        }
 
-    let mut phdr_iter = kernel_elf.program_header_iter();
-    let first_phdr = phdr_iter.next().unwrap();
-    if first_phdr.ph_type() == ProgramType::LOAD {
-        map_kernel_from_phdr(0, &first_phdr);
-    } else if first_phdr.ph_type() == ProgramType::DYNAMIC {
-        panic!("Kernel is somehow a dynamically linked executable!");
-    }
-
-    // Assuming that the section addrs never require a new table to be created(that'd require
-    // the section to be obscenely big!)
-    let higher_half_pml4_index = (first_phdr.vaddr() >> 39 & 0b111111111) as usize;
-    let higher_half_pdpt_index = (first_phdr.vaddr() >> 30 & 0b111111111) as usize;
-    let higher_half_pdt_index = (first_phdr.vaddr() >> 21 & 0b111111111) as usize;
-
-    PML4[higher_half_pml4_index] = (addr_of!(HIGHER_HALF_PDPT) as u32 | 0b11) as u64;
-    HIGHER_HALF_PDPT[higher_half_pdpt_index] = (addr_of!(HIGHER_HALF_PDT) as u32 | 0b11) as u64;
-
-    let kernel_content_start = addr_of!(KERNEL_CONTENT) as usize;
-    let kernel_content_end = kernel_content_start + KERNEL_CONTENT.len() - 1;
-    let mut cur_addr = kernel_content_start;
-    let mut entry_idx = 0;
-
-    while cur_addr <= kernel_content_end {
-        let entry = cur_addr | 0b10000011;
-        HIGHER_HALF_PDT[higher_half_pdt_index + entry_idx as usize] = entry as u64;
-
-        cur_addr += 0x200000;
-        entry_idx += 1;
-    }
-
-    for phdr in phdr_iter {
-        if phdr.ph_type() == ProgramType::LOAD {
-            map_kernel_from_phdr((phdr.offset() - first_phdr.vaddr()) as usize, &phdr);
-        } else if phdr.ph_type() == ProgramType::DYNAMIC {
+        let mut phdr_iter = kernel_elf.program_header_iter();
+        let first_phdr = phdr_iter.next().unwrap();
+        if first_phdr.ph_type() == ProgramType::LOAD {
+            map_kernel_from_phdr(0, &first_phdr);
+        } else if first_phdr.ph_type() == ProgramType::DYNAMIC {
             panic!("Kernel is somehow a dynamically linked executable!");
         }
+
+        // Assuming that the section addrs never require a new table to be created(that'd require
+        // the section to be obscenely big!)
+        let higher_half_pml4_index = (first_phdr.vaddr() >> 39 & 0b111111111) as usize;
+        let higher_half_pdpt_index = (first_phdr.vaddr() >> 30 & 0b111111111) as usize;
+        let higher_half_pdt_index = (first_phdr.vaddr() >> 21 & 0b111111111) as usize;
+
+        PML4[higher_half_pml4_index] = (addr_of!(HIGHER_HALF_PDPT) as u32 | 0b11) as u64;
+        HIGHER_HALF_PDPT[higher_half_pdpt_index] = (addr_of!(HIGHER_HALF_PDT) as u32 | 0b11) as u64;
+
+        let kernel_content_start = addr_of!(KERNEL_CONTENT) as usize;
+        #[allow(static_mut_refs)]
+        let kernel_content_end = kernel_content_start + KERNEL_CONTENT.len() - 1;
+        let mut cur_addr = kernel_content_start;
+        let mut entry_idx = 0;
+
+        while cur_addr <= kernel_content_end {
+            let entry = cur_addr | 0b10000011;
+            HIGHER_HALF_PDT[higher_half_pdt_index + entry_idx as usize] = entry as u64;
+
+            cur_addr += 0x200000;
+            entry_idx += 1;
+        }
+
+        for phdr in phdr_iter {
+            if phdr.ph_type() == ProgramType::LOAD {
+                map_kernel_from_phdr((phdr.offset() - first_phdr.vaddr()) as usize, &phdr);
+            } else if phdr.ph_type() == ProgramType::DYNAMIC {
+                panic!("Kernel is somehow a dynamically linked executable!");
+            }
+        }
+
+        PML4[510] = addr_of!(PML4) as u64 | 0b11;
+
+        #[allow(static_mut_refs)]
+        let kernel_size = KERNEL_CONTENT.len();
+        serial_println!(
+            "Kernel size in memory = {} bytes or {} MB",
+            kernel_size,
+            kernel_size as f64 / MB as f64
+        );
+
+        first_phdr.vaddr()
     }
-
-    PML4[510] = addr_of!(PML4) as u64 | 0b11;
-
-    serial_println!(
-        "Kernel size in memory = {} bytes or {} MB",
-        KERNEL_CONTENT.len(),
-        KERNEL_CONTENT.len() as f64 / MB as f64
-    );
-
-    first_phdr.vaddr()
 }
 
 unsafe fn enable_paging() {
-    let pml4_addr = (addr_of!(PML4) as *const u64) as u32;
+    unsafe {
+        let pml4_addr = (addr_of!(PML4) as *const u64) as u32;
 
-    asm!(
+        asm!(
     "// load P4 to cr3 register (cpu uses this to access the P4 table)
     mov eax, {}
     mov cr3, eax
@@ -149,21 +155,24 @@ unsafe fn enable_paging() {
     or eax, 1 << 31
     mov cr0, eax
     ", in(reg) pml4_addr)
+    }
 }
 
 unsafe fn load_gdt() {
-    #[repr(C, packed(2))]
-    struct DescriptorTablePointer {
-        limit: u16,
-        base: u64,
+    unsafe {
+        #[repr(C, packed(2))]
+        struct DescriptorTablePointer {
+            limit: u16,
+            base: u64,
+        }
+
+        let pointer = DescriptorTablePointer {
+            limit: (GDT.len() * size_of::<u64>() - 1) as u16,
+            base: GDT.as_ptr() as u64,
+        };
+
+        asm!("lgdt [{}]", in(reg) addr_of!(pointer));
     }
-
-    let pointer = DescriptorTablePointer {
-        limit: (GDT.len() * size_of::<u64>() - 1) as u16,
-        base: GDT.as_ptr() as u64,
-    };
-
-    asm!("lgdt [{}]", in(reg) addr_of!(pointer));
 }
 
 /// Passes information about the kernel's physical address after it is copied to [`KERNEL_CONTENT`].
@@ -181,13 +190,15 @@ pub struct KernelContentInfo {
 // Inlining this function causes fault.
 #[inline(never)]
 unsafe fn call_kernel(mb_ptr: u32, kernel_content_info: u32, kernel_addr: u32) {
-    asm!(
+    unsafe {
+        asm!(
     "mov edi, {}
     mov esi, {}
     // Offset for the code segment in the GDT
     push 0x8
     push {}
     retf", in(reg) mb_ptr, in(reg) kernel_content_info, in(reg) kernel_addr)
+    }
 }
 
 unsafe fn display_logo() {
@@ -220,7 +231,7 @@ unsafe fn display_logo() {
 
     // The logo is assumed to be a valid TGA file. Hence, there is no validation.
     // This is also the reason this function is marked unsafe.
-    #[repr(packed)]
+    #[repr(packed, C)]
     struct TGAHeader {
         _magic1: u8,
         _colormap: u8,
@@ -291,7 +302,7 @@ unsafe fn display_logo() {
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "cdecl" fn prekernel_main(mb_ptr: *const BootInformationHeader) -> ! {
     let mb_info = unsafe { BootInformation::load(mb_ptr).unwrap() };
     BOOT_INFO.call_once(|| mb_info);
@@ -333,6 +344,7 @@ pub extern "cdecl" fn prekernel_main(mb_ptr: *const BootInformationHeader) -> ! 
     let kernel_content_info;
     unsafe {
         let kernel_content_start = addr_of!(KERNEL_CONTENT) as u32;
+        #[allow(static_mut_refs)]
         let kernel_content_end = kernel_content_start + KERNEL_CONTENT.len() as u32 - 1;
         kernel_content_info = KernelContentInfo {
             virt_start_addr: kernel_higher_half_start_addr,
