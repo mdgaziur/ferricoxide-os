@@ -18,13 +18,14 @@
 
 import argparse
 import os
+import platform
 import shlex
 import shutil
 import subprocess
 import sys
 from enum import Enum
 
-SUPPORTED_ARCHITECTURES = ["x86_64"]
+SUPPORTED_ARCHITECTURES = ['x86_64']
 ARCHITECTURE_INFO = {
     "x86_64": {
         "boot": "x86",
@@ -35,15 +36,18 @@ ARCHITECTURE_INFO = {
         "kernel_assemblies": ["kernel/arch/x86_64"],
         "prekernel_link_arch": "elf_i386",
         "kernel_link_arch": "elf_x86_64",
+        "kernel_link_arch_macos_ld": "x86_64",
         "prekernel_linker_script": "prekernel/arch/x86/linker.ld",
         "kernel_linker_script": "kernel/arch/x86_64/linker.ld",
         "prekernel_entry": "start",
         "kernel_entry": "kernel_start",
         "prekernel_asm_arch": "elf32",
         "kernel_asm_arch": "elf64",
+        "objcopy": "x86_64-elf-objcopy",
+        "ld": "x86_64-elf-ld",
+        "grub-mkrescue": "x86_64-elf-grub-mkrescue",
     }
 }
-
 
 class BuildMode(Enum):
     RELEASE = 0
@@ -117,17 +121,18 @@ def build_assemblies(crate: str, directory: str, build_dir):
     for assembly in assemblies:
         print(f"- Assembling assembly: `{directory}/{assembly}`")
         execute_command(f"assemble assembly at `{directory}/{assembly}`",
-                        f"nasm -f{ARCHITECTURE_INFO[build_config["architecture"]][f"{crate}_asm_arch"]} {directory}/{assembly} -o {build_dir}/{''.join(assembly.split('.')[:-1])}.o", True)
+                        f"nasm -f{ARCHITECTURE_INFO[build_config['architecture']][f'{crate}_asm_arch']} {directory}/{assembly} -o {build_dir}/{''.join(assembly.split('.')[:-1])}.o", True)
 
 
 def link_crate(crate: str, output: str, build_dir: str):
     files = map(lambda f: build_dir + "/" + f, os.listdir(build_dir))
 
     print(f"Linking `{crate}`...")
+
     execute_command(f"link {crate}",
-                    f"ld -m {ARCHITECTURE_INFO[build_config["architecture"]][f"{crate}_link_arch"]} -n "
-                    f"--gc-sections -T {ARCHITECTURE_INFO[build_config["architecture"]][f"{crate}_linker_script"]}"
-                    f" -o {output} {' '.join(files)} --entry {ARCHITECTURE_INFO[build_config["architecture"]][f"{crate}_entry"]}",
+                    f"{ARCHITECTURE_INFO[build_config['architecture']]['ld']} -m {ARCHITECTURE_INFO[build_config['architecture']][f'{crate}_link_arch']} -n "
+                    f"--gc-sections -T {ARCHITECTURE_INFO[build_config['architecture']][f'{crate}_linker_script']}"
+                    f" -o {output} {' '.join(files)} --entry {ARCHITECTURE_INFO[build_config['architecture']][f'{crate}_entry']}",
                     True)
 
 
@@ -146,11 +151,11 @@ def build_crate(crate: str, release: bool, build_dir: str):
 
     shutil.copy(
         f"{crate}/target/"
-        f"{ARCHITECTURE_INFO[build_config["architecture"]][f"{crate}_rust_builddir"]}/"
-        f"{"release" if build_config["release"] else "debug"}/lib{crate}.a",
+        f"{ARCHITECTURE_INFO[build_config['architecture']][f'{crate}_rust_builddir']}/"
+        f"{'release' if build_config['release'] else 'debug'}/lib{crate}.a",
         build_dir)
 
-    for assembly_dir in ARCHITECTURE_INFO[build_config["architecture"]][f"{crate}_assemblies"]:
+    for assembly_dir in ARCHITECTURE_INFO[build_config['architecture']][f'{crate}_assemblies']:
         build_assemblies(crate, assembly_dir,
                          build_dir)
 
@@ -164,7 +169,7 @@ def turn_kernel_into_binary_object(build_dir: str):
 
     execute_command(
         "turn `kernel.bin` into a binary object",
-        f"objcopy kernel.bin kernel.o -I binary -B i386 -O elf32-i386",
+        f"{ARCHITECTURE_INFO[build_config['architecture']]['objcopy']} kernel.bin kernel.o -I binary -B i386 -O elf32-i386",
         True
     )
 
@@ -178,7 +183,7 @@ def determine_kernel_total_memsz():
     from elftools.elf.segments import Segment
 
     total_size = 0
-    kernel_elf_path = f"build/{build_config["architecture"]}/kernel/kernel.bin"
+    kernel_elf_path = f"build/{build_config['architecture']}/kernel/kernel.bin"
     with open(kernel_elf_path, "rb") as kernel_elf:
         for phdr in ELFFile(kernel_elf).iter_segments():
             if len(phdr.data()) != 0:
@@ -192,14 +197,14 @@ def determine_kernel_total_memsz():
 
 def make_iso():
     print("Making iso...")
-    os.makedirs(f"build/{build_config["architecture"]}/iso_tree/boot/grub")
-    shutil.copy(f"build/{build_config["architecture"]}/prekernel/prekernel.bin",
-                f"build/{build_config["architecture"]}/iso_tree/boot/"
-                f"{build_config["architecture"]}-ferricoxide_os.bin")
-    shutil.copy(f"prekernel/arch/{ARCHITECTURE_INFO[build_config["architecture"]]["boot"]}/boot/grub.cfg",
-                f"build/{build_config["architecture"]}/iso_tree/boot/grub")
-    command = (f"grub-mkrescue -o build/{build_config["architecture"]}/"
-               f"{build_config["architecture"]}-ferricoxide_os.iso build/{build_config["architecture"]}/iso_tree")
+    os.makedirs(f"build/{build_config['architecture']}/iso_tree/boot/grub")
+    shutil.copy(f"build/{build_config['architecture']}/prekernel/prekernel.bin",
+                f"build/{build_config['architecture']}/iso_tree/boot/"
+                f"{build_config['architecture']}-ferricoxide_os.bin")
+    shutil.copy(f"prekernel/arch/{ARCHITECTURE_INFO[build_config['architecture']]['boot']}/boot/grub.cfg",
+                f"build/{build_config['architecture']}/iso_tree/boot/grub")
+    command = (f"{ARCHITECTURE_INFO[build_config['architecture']]['grub-mkrescue']} -o build/{build_config['architecture']}/"
+               f"{build_config['architecture']}-ferricoxide_os.iso build/{build_config['architecture']}/iso_tree")
 
     execute_command(
         "create iso",
@@ -209,16 +214,16 @@ def make_iso():
 
 
 def boot():
-    iso_path = f"build/{build_config["architecture"]}/{build_config["architecture"]}-ferricoxide_os.iso"
+    iso_path = f"build/{build_config['architecture']}/{build_config['architecture']}-ferricoxide_os.iso"
     if not os.path.exists(iso_path):
         eprint("\033[91mRun with --build first.\033[0m")
         return
 
     print(f"Booting from `{iso_path}`...")
-    command = (f"qemu-system-{build_config["architecture"]} -m {build_config["memory"]}M "
-               f"-bios {build_config["ovmf_path"]} "
+    command = (f"qemu-system-{build_config['architecture']} -m {build_config['memory']}M "
+               f"-bios {build_config['ovmf_path']} "
                f"-cdrom {iso_path} "
-               f"-d cpu_reset  -serial stdio -no-reboot -no-shutdown -s " + build_config["extra_qemu_args"])
+               f"-d cpu_reset  -serial stdio -no-reboot -no-shutdown -s " + build_config['extra_qemu_args'])
 
     execute_command(
         "boot",
@@ -246,31 +251,32 @@ def main():
     args = parser.parse_args()
 
     if args.release:
-        build_config["build_mode"] = BuildMode.RELEASE
+        build_config['build_mode'] = BuildMode.RELEASE
 
-    build_config["architecture"] = args.architecture
-    build_config["build"] = args.build
-    build_config["boot"] = args.boot
-    build_config["reformat"] = args.reformat
-    build_config["fix"] = args.fix
-    build_config["memory"] = args.memory
-    build_config["release"] = args.release
-    build_config["extra_qemu_args"] = args.extra_qemu_args if args.extra_qemu_args else ""
+    build_config['architecture'] = args.architecture
+    build_config['build'] = args.build
+    build_config['boot'] = args.boot
+    build_config['reformat'] = args.reformat
+    build_config['fix'] = args.fix
+    build_config['memory'] = args.memory
+    build_config['release'] = args.release
+    build_config['extra_qemu_args'] = args.extra_qemu_args if args.extra_qemu_args else ""
+    build_config['ovmf_path'] = args.bios_path
 
 
-    if build_config["fix"]:
+    if build_config['fix']:
         fix_code("prekernel")
         fix_code("kernel")
 
-    if build_config["reformat"]:
+    if build_config['reformat']:
         reformat_code("prekernel")
         reformat_code("kernel")
 
-    if build_config["fix"] or build_config["reformat"]:
+    if build_config['fix'] or build_config['reformat']:
         return
 
-    if build_config["build"]:
-        build_dir = f"build/{build_config["architecture"]}"
+    if build_config['build']:
+        build_dir = f"build/{build_config['architecture']}"
         if os.path.exists(build_dir):
             print(f"Build dir `{build_dir}` already exists, removing it")
             shutil.rmtree(build_dir)
@@ -279,18 +285,18 @@ def main():
         os.mkdir(build_dir + "/prekernel")
         os.mkdir(build_dir + "/kernel")
 
-        build_crate("kernel", build_config["release"], build_dir + "/kernel")
+        build_crate("kernel", build_config['release'], build_dir + "/kernel")
         turn_kernel_into_binary_object(build_dir)
         determine_kernel_total_memsz()
 
-        build_crate("prekernel", build_config["release"], build_dir + "/prekernel")
+        build_crate("prekernel", build_config['release'], build_dir + "/prekernel")
 
         make_iso()
 
-    if build_config["boot"]:
+    if build_config['boot']:
         boot()
 
-    if build_config["boot"] or build_config["build"]:
+    if build_config['boot'] or build_config['build']:
         return
 
     parser.print_usage()
