@@ -1,4 +1,4 @@
-#! /bin/env python3
+#! /usr/bin/env python3
 
 #  FerricOxide OS is an operating system that aims to be posix compliant and memory safe
 #  Copyright (C) 2024  MD Gaziur Rahman Noor
