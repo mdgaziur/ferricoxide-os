@@ -17,7 +17,6 @@
  */
 
 #![no_std]
-#![feature(naked_functions)]
 
 /// # Prekernel
 ///

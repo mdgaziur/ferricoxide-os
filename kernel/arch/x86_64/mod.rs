@@ -41,37 +41,35 @@ static STACKOVERFLOW_GUARD: [u8; 4096] = [0; 4096];
 static KERNEL_STACK_TOP: &u8 = &KERNEL_STACK[KERNEL_STACK.len() - 1];
 
 #[unsafe(no_mangle)]
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn kernel_start() {
-    unsafe {
-        naked_asm!(
-            "mov ax, 0
+    naked_asm!(
+        "mov ax, 0
         mov ss, ax
         mov ds, ax
         mov es, ax
         mov fs, ax
         mov gs, ax
-
+    
         // set the NXE bit
         mov rcx, 0xC0000080
         rdmsr
         or rax, 1 << 11
         wrmsr
-
+    
         // enable write protection
         mov rax, cr0
         or rax, 1 << 16
         mov cr0, rax
-
+    
         mov rsp, KERNEL_STACK_TOP
-
+    
         // Jump to the higher half address of `actually_kernel_start`
         // so that gdb can point out which part of the kernel we are executing
         lea rax, [actually_kernel_start]
         push rax
         ret"
-        );
-    }
+    );
 }
 
 #[unsafe(no_mangle)]
@@ -81,6 +79,7 @@ fn actually_kernel_start(
 ) -> ! {
     let mb_info = unsafe { BootInformation::load(boot_information_header).unwrap() };
     BOOT_INFO.call_once(|| mb_info);
+    serial_println!("{:p}", kernel_content_info);
     KERNEL_CONTENT_INFO.call_once(|| unsafe { *kernel_content_info });
 
     serial_println!("The kernel is aliveeeeeeee!!!!!!!!!!!");
