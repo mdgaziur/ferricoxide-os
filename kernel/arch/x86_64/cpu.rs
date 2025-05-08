@@ -15,6 +15,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
+
 use crate::arch::x86_64::mm::VirtAddr;
 use core::arch::asm;
 
@@ -40,5 +41,17 @@ pub unsafe fn read_cr3() -> u64 {
 pub fn write_cr3(value: u64) {
     unsafe {
         asm!("mov cr3, {}", in(reg) value, options(nostack, preserves_flags));
+    }
+}
+
+pub fn halt_loop() -> ! {
+    unsafe {
+        asm!("cli", options(nostack, preserves_flags));
+    }
+
+    loop {
+        unsafe {
+            asm!("hlt", options(nostack, preserves_flags));
+        }
     }
 }
