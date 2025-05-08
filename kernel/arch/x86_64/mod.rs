@@ -17,13 +17,16 @@
  */
 
 mod cpu;
+mod gdt;
+mod interrupts;
 mod mm;
 
-use crate::arch::x86_64::mm::mm_init;
+use crate::arch::x86_64::gdt::load_gdt;
 use crate::kutils::{KERNEL_STACK_SIZE, KernelContentInfo};
 use crate::serial_println;
 use core::arch::{asm, naked_asm};
 use core::ptr::addr_of;
+use mm::mm_init;
 use multiboot2::{BootInformation, BootInformationHeader};
 use spin::Once;
 
@@ -39,6 +42,8 @@ static STACKOVERFLOW_GUARD: [u8; 4096] = [0; 4096];
 
 #[unsafe(no_mangle)]
 static KERNEL_STACK_TOP: &u8 = &KERNEL_STACK[KERNEL_STACK.len() - 1];
+
+static KERNEL_GDT: [u64; 2] = [0, (1 << 43) | (1 << 44) | (1 << 47) | (1 << 53)];
 
 #[unsafe(no_mangle)]
 #[unsafe(naked)]
@@ -66,10 +71,31 @@ unsafe extern "C" fn kernel_start() {
     
         // Jump to the higher half address of `actually_kernel_start`
         // so that gdb can point out which part of the kernel we are executing
-        lea rax, [actually_kernel_start]
+        lea rax, [kernel_start_with_old_gdt]
         push rax
         ret"
     );
+}
+
+#[unsafe(no_mangle)]
+fn kernel_start_with_old_gdt() -> ! {
+    // Set the same GDT from the prekernel to avoid the kernel crashing when it is accessed
+    // in future
+    load_gdt(&KERNEL_GDT);
+    
+    // Call the kernel with new the new GDT
+    // NOTE: even though this function doesn't take any arguments,
+    //       the arguments taken by `actually_kernel_start` are already
+    //       in the necessary registers
+    unsafe {
+        asm!(
+            "lea rax, [actually_kernel_start]
+            push 0x8
+            push rax
+            retfq",
+            options(noreturn)
+        )
+    }
 }
 
 #[unsafe(no_mangle)]
