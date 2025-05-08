@@ -361,7 +361,7 @@ impl PageTable<P4> {
         self.next_table_addr(index).map(|addr| unsafe { &*addr })
     }
 
-    pub fn next_table_mut(&self, index: usize) -> Option<&mut PageTable<P3>> {
+    pub fn next_table_mut(&mut self, index: usize) -> Option<&mut PageTable<P3>> {
         self.next_table_addr(index)
             .map(|addr| unsafe { &mut *addr })
     }
@@ -398,7 +398,7 @@ impl PageTable<P3> {
         self.next_table_addr(index).map(|addr| unsafe { &*addr })
     }
 
-    pub fn next_table_mut(&self, index: usize) -> Option<&mut PageTable<P2>> {
+    pub fn next_table_mut(&mut self, index: usize) -> Option<&mut PageTable<P2>> {
         self.next_table_addr(index)
             .map(|addr| unsafe { &mut *addr })
     }
@@ -435,7 +435,7 @@ impl PageTable<P2> {
         self.next_table_addr(index).map(|addr| unsafe { &*addr })
     }
 
-    pub fn next_table_mut(&self, index: usize) -> Option<&mut PageTable<P1>> {
+    pub fn next_table_mut(&mut self, index: usize) -> Option<&mut PageTable<P1>> {
         self.next_table_addr(index)
             .map(|addr| unsafe { &mut *addr })
     }
@@ -553,8 +553,7 @@ impl Page {
     pub fn containing_address(addr: usize) -> Self {
         assert!(
             addr <= 0x0000_8000_0000_0000 || addr >= 0xffff_8000_0000_0000,
-            "invalid address: 0x{:x}",
-            addr
+            "invalid address: 0x{addr:x}"
         );
 
         Self {
