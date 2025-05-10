@@ -16,8 +16,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 use crate::arch::x86_64::mm::PhysAddr;
-use crate::arch::x86_64::{BOOT_INFO, KERNEL_CONTENT_INFO, mm};
-use crate::ds::{StaticBitmap, static_bitmap_size};
+use crate::arch::x86_64::{mm, BOOT_INFO, KERNEL_CONTENT_INFO};
+use crate::ds::{static_bitmap_size, StaticBitmap};
 use crate::kutils::{ADDRESS_SPACE_SIZE, KB, MB};
 use crate::{serial_println, verify_called_once};
 use multiboot2::MemoryAreaType;
@@ -58,7 +58,8 @@ impl BitmapFrameAllocator {
         let framebuffer_tag = boot_info.framebuffer_tag().unwrap().unwrap();
         self.reserve_area(
             framebuffer_tag.address() as usize,
-            (framebuffer_tag.height() * framebuffer_tag.pitch()) as usize,
+            framebuffer_tag.address() as usize
+                + (framebuffer_tag.height() * framebuffer_tag.pitch()) as usize,
         );
 
         for memory_map in boot_info.memory_map_tag().unwrap().memory_areas() {
@@ -93,6 +94,11 @@ impl BitmapFrameAllocator {
     }
 
     fn reserve_area(&mut self, start: usize, end: usize) -> usize {
+        assert!(
+            start <= end,
+            "start address must be less than or equal to end address"
+        );
+
         let start = mm::align_down(start, FRAME_SIZE);
         let mut end = mm::align_up(end, FRAME_SIZE);
 
