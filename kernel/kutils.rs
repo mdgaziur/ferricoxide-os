@@ -44,7 +44,7 @@ macro_rules! verify_called_once {
 }
 
 #[derive(Debug, Copy, Clone)]
-#[repr(C)]
+#[repr(C, align(8))]
 pub struct KernelContentInfo {
     pub virt_start_addr: u64,
     pub phys_start_addr: u32,
