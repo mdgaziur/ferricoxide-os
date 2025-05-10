@@ -56,7 +56,7 @@ class BuildMode(Enum):
 
 build_config = {
     "arch": SUPPORTED_ARCHITECTURES[0],
-    "memory": 128,
+    "memory": 256,
     "fix": False,
     "reformat": True,
     "build_mode": BuildMode.DEBUG,
@@ -180,14 +180,17 @@ def turn_kernel_into_binary_object(build_dir: str):
 
 def determine_kernel_total_memsz():
     from elftools.elf.elffile import ELFFile
-    from elftools.elf.segments import Segment
+
+    def align_up(value, alignment):
+        return (value + alignment - 1) & ~(alignment - 1)
 
     total_size = 0
     kernel_elf_path = f"build/{build_config['architecture']}/kernel/kernel.bin"
     with open(kernel_elf_path, "rb") as kernel_elf:
         for phdr in ELFFile(kernel_elf).iter_segments():
-            if len(phdr.data()) != 0:
-                total_size += phdr.header['p_memsz']
+            if phdr.header['p_type'] == 'PT_LOAD':
+                # Prekernel maps using 2MB huge pages
+                total_size += align_up(phdr.header['p_memsz'], 0x200000)
 
     kernel_sz_code = (f"// Auto generated code by `b.py`. DO NOT EDIT!\n"
                       f"pub const KERNEL_CONTENT_TOTAL_MEMSZ: usize = {total_size};")
@@ -244,7 +247,7 @@ def main():
     parser.add_argument("--boot", help="boot Ferricoxide OS", action='store_true')
     parser.add_argument("--reformat", help="reformat code", action='store_true')
     parser.add_argument("--fix", help="fix lint errors", action='store_true')
-    parser.add_argument("-m", "--memory", help="total memory given to the OS", default=128)
+    parser.add_argument("-m", "--memory", help="total memory given to the OS", default=256)
     parser.add_argument("-q", "--extra-qemu-args", help="extra arguments for QEMU(should be escaped)")
     parser.add_argument("-b", "--bios-path", help="path to bios. Default: `/usr/share/ovmf/x64/OVMF.4m.fd`", default="/usr/share/ovmf/x64/OVMF.fd")
 
