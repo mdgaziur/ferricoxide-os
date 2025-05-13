@@ -15,7 +15,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-use crate::arch::x86_64::mm::frame::FrameAllocator;
+use crate::arch::x86_64::mm::frame::{Frame, FrameAllocator};
 use crate::arch::x86_64::{BOOT_INFO, KERNEL_CONTENT_INFO, STACKOVERFLOW_GUARD};
 use core::cmp::max;
 use core::ptr::addr_of;
@@ -30,7 +30,7 @@ use crate::arch::x86_64::mm::paging::{
 use crate::kutils::MB;
 use crate::serial_println;
 use linked_list_allocator::LockedHeap;
-use spin::Once;
+use spin::{Mutex, Once};
 
 pub type PhysAddr = usize;
 
@@ -40,9 +40,9 @@ pub type VirtAddr = usize;
 static KERNEL_HEAP_ALLOCATOR: LockedHeap = LockedHeap::empty();
 const KERNEL_HEAP_SIZE: usize = 16 * MB;
 
-static ACTIVE_PML4: Once<ActivePML4> = Once::new();
+pub static ACTIVE_PML4: Once<Mutex<ActivePML4>> = Once::new();
 
-pub fn mm_init() {
+pub fn init() {
     FRAME_ALLOCATOR.lock().init();
 
     let mut frame_allocator = FRAME_ALLOCATOR.lock();
@@ -122,7 +122,7 @@ pub fn mm_init() {
             .init(heap_addr as *mut u8, KERNEL_HEAP_SIZE);
     }
 
-    ACTIVE_PML4.call_once(|| active_pml4);
+    ACTIVE_PML4.call_once(|| Mutex::new(active_pml4));
 
     serial_println!(
         "Total memory: {} MB",
@@ -139,6 +139,23 @@ pub fn mm_init() {
     serial_println!(
         "Free kernel heap: {} MB",
         KERNEL_HEAP_ALLOCATOR.lock().free() as f64 / MB as f64
+    );
+}
+
+pub fn translate_addr(addr: VirtAddr) -> Option<PhysAddr> {
+    let active_pml4 = ACTIVE_PML4.get().unwrap().lock();
+
+    active_pml4.translate(addr)
+}
+
+pub fn identity_map(addr: PhysAddr, flags: PageTableEntryFlags) {
+    let mut frame_allocator = FRAME_ALLOCATOR.lock();
+    let mut active_pml4 = ACTIVE_PML4.get().unwrap().lock();
+
+    active_pml4.identity_map(
+        Frame::containing_address(addr),
+        flags,
+        &mut *frame_allocator,
     );
 }
 

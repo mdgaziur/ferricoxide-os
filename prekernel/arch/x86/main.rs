@@ -85,10 +85,13 @@ unsafe fn map_kernel_to_higher_half(kernel_elf: &Elf) -> u64 {
         let end_addr = cur_addr + phdr_size;
         let mut entry_idx = 0;
 
-
         while cur_addr < end_addr {
             serial_println!("Mapping kernel from phdr = {:#x?}, entry_idx = {:#x?}, higher_half_pdt_index = {:#x?}", cur_addr, entry_idx, higher_half_pdt_index);
-            serial_println!("cur_addr(bin) = {:b}, cur_addr(hex) = {:#x?}", cur_addr, cur_addr);
+            serial_println!(
+                "cur_addr(bin) = {:b}, cur_addr(hex) = {:#x?}",
+                cur_addr,
+                cur_addr
+            );
             let entry = cur_addr | 0b10000011;
             HIGHER_HALF_PDT[higher_half_pdt_index + entry_idx as usize] = entry;
 
@@ -96,8 +99,7 @@ unsafe fn map_kernel_to_higher_half(kernel_elf: &Elf) -> u64 {
             entry_idx += 1;
         }
 
-        KERNEL_CONTENT[*offset..(*offset + phdr_content.len())]
-            .copy_from_slice(phdr_content);
+        KERNEL_CONTENT[*offset..(*offset + phdr_content.len())].copy_from_slice(phdr_content);
         offset.add_assign(phdr_size as usize);
     }
 
@@ -141,17 +143,16 @@ unsafe fn map_kernel_to_higher_half(kernel_elf: &Elf) -> u64 {
             serial_println!("Zeroing out section: {}", section_name);
             let section_vaddr = section.addr();
             let section_size = section.size();
-    
+
             let base_offset = section_vaddr - first_phdr.vaddr();
             unsafe {
-                KERNEL_CONTENT[base_offset as usize..(base_offset + section_size) as usize]
-                    .fill(0);
+                KERNEL_CONTENT[base_offset as usize..(base_offset + section_size) as usize].fill(0);
             }
         } else {
             serial_println!("Skipping zeroing out section: {}", section_name);
         }
     };
-    
+
     zero_out_section(".bss");
     zero_out_section(".kernel_stack");
 

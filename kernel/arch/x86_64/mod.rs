@@ -16,6 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+mod acpi;
 mod cpu;
 mod gdt;
 mod interrupts;
@@ -25,7 +26,6 @@ use crate::kutils::{KERNEL_STACK_SIZE, KernelContentInfo};
 use crate::serial_println;
 use core::arch::naked_asm;
 use core::ptr::addr_of;
-use mm::mm_init;
 use multiboot2::{BootInformation, BootInformationHeader};
 use spin::Once;
 
@@ -101,8 +101,13 @@ fn actually_kernel_start(
     serial_println!("KERNEL_STACK: {:p}", addr_of!(KERNEL_STACK));
     serial_println!("KERNEL_STACK end: {:p}", KERNEL_STACK_TOP);
 
-    mm_init();
+    let mut vendor = [0; 13];
+    cpu::cpuid::cpuid_get_vendor(&mut vendor);
+    serial_println!("Vendor: {}", str::from_utf8(&vendor).unwrap());
+    serial_println!("Vendor(bytes): {:?}", vendor);
 
+    mm::init();
+    acpi::init();
     interrupts::init();
 
     halt_loop();
