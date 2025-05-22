@@ -219,9 +219,7 @@ unsafe fn parse_interrupt_control_structure(
 ///
 /// Make sure that the pointer to `raw_sdt_ptr` is valid
 pub unsafe fn parse_apic_sdt(sdt_header: ACPISDTHeader) -> APICSDT {
-    let raw_apic_sdt: &RawAPICSDT = unsafe {
-        &*(sdt_header.raw_addr as *const RawAPICSDT)
-    };
+    let raw_apic_sdt: &RawAPICSDT = unsafe { &*(sdt_header.raw_addr as *const RawAPICSDT) };
     let lapic_address = raw_apic_sdt.lapic_address;
     let flags = MultipleAPICFlags::from_bits_truncate(raw_apic_sdt.flags);
 

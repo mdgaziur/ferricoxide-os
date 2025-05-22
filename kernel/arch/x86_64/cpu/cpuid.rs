@@ -120,12 +120,16 @@ pub fn cpuid_getfeatures() -> (CPUIDECXFeature, CPUIDEDXFeature) {
     unsafe {
         asm!(
             "
+                push rdx
+                push rcx
                 push rax
                 mov eax, 1
                 cpuid
                 pop rax
                 mov {:e}, ecx
                 mov {:e}, edx
+                pop rcx
+                pop rdx
             ",
             out(reg) ecx,
             out(reg) edx,
@@ -136,4 +140,44 @@ pub fn cpuid_getfeatures() -> (CPUIDECXFeature, CPUIDEDXFeature) {
         CPUIDECXFeature::from_bits(ecx).unwrap(),
         CPUIDEDXFeature::from_bits(edx).unwrap(),
     )
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct ProcessorFreqInfo {
+    pub denominator: u32,
+    pub numerator: u32,
+    pub core_crystal_clock_freq: u32,
+}
+
+pub fn cpuid_core_crystal_freq() -> ProcessorFreqInfo {
+    let denominator: u32;
+    let numerator: u32;
+    let core_crystal_clock_freq: u32;
+
+    unsafe {
+        asm!("
+                push rbx
+                mov eax, 0x15
+                cpuid
+                mov r10d, ebx
+                pop rbx
+            ",
+            out("eax") denominator,
+            out("r10d") numerator,
+            out("ecx") core_crystal_clock_freq,
+        )
+    }
+
+    serial_println!(
+        "CPUID core crystal clock freq: denominator: {}, numerator: {}, core_crystal_clock_freq: {}",
+        denominator,
+        numerator,
+        core_crystal_clock_freq
+    );
+
+    ProcessorFreqInfo {
+        denominator,
+        numerator,
+        core_crystal_clock_freq,
+    }
 }

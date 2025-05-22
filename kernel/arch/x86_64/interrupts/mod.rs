@@ -1,8 +1,15 @@
 use crate::arch::x86_64::cpu::halt_loop;
 use crate::arch::x86_64::gdt::DOUBLE_FAULT_IST_INDEX;
+use crate::arch::x86_64::interrupts::pit::{TIMER_VECTOR, pit_handler, pit_sleep};
 use crate::serial_println;
+use core::arch::asm;
 use lazy_static::lazy_static;
+use x86_64::instructions::interrupts;
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode};
+
+mod apic;
+mod ioapic;
+mod pit;
 
 lazy_static! {
     pub static ref IDT: InterruptDescriptorTable = {
@@ -10,6 +17,7 @@ lazy_static! {
         idt.breakpoint.set_handler_fn(breakpoint_handler);
         idt.page_fault.set_handler_fn(pagefault_handler);
         idt.divide_error.set_handler_fn(divide_by_zero);
+        idt[TIMER_VECTOR].set_handler_fn(pit_handler);
         unsafe {
             idt.double_fault
                 .set_handler_fn(double_fault_handler)
@@ -55,6 +63,30 @@ extern "x86-interrupt" fn double_fault_handler(
     halt_loop()
 }
 
+fn mask_pic() {
+    unsafe {
+        asm!(
+            "
+                mov al, 0xFF
+                out 0xA1, al        // Mask all IRQs on PIC2
+                out 0x21, al        // Mask all IRQs on PIC1
+            "
+        )
+    }
+}
+
+pub fn sleep(millis: u64) {
+    pit_sleep(millis);
+}
+
 pub fn init() {
+    mask_pic();
+
     IDT.load();
+
+    apic::init();
+    ioapic::init();
+    pit::init();
+
+    interrupts::enable();
 }

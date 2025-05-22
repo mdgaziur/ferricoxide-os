@@ -15,6 +15,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
+#![allow(dead_code)]
+
 pub mod cpuid;
 
 use crate::arch::x86_64::mm::VirtAddr;
@@ -45,10 +47,35 @@ pub fn write_cr3(value: u64) {
     }
 }
 
+pub fn halt_loop_no_interrupt() -> ! {
+    loop {
+        unsafe {
+            asm!("cli", options(nostack, preserves_flags));
+            asm!("hlt", options(nostack, preserves_flags));
+        }
+    }
+}
+
 pub fn halt_loop() -> ! {
+    unsafe {
+        asm!("sti", options(nostack, preserves_flags));
+    }
+
     loop {
         unsafe {
             asm!("hlt", options(nostack, preserves_flags));
         }
+    }
+}
+
+pub fn halt() {
+    unsafe {
+        asm!(
+            "
+                sti
+                hlt
+            ",
+            options(nostack, preserves_flags)
+        );
     }
 }
