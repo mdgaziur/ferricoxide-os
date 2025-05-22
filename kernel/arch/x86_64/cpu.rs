@@ -46,10 +46,6 @@ pub fn write_cr3(value: u64) {
 }
 
 pub fn halt_loop() -> ! {
-    unsafe {
-        asm!("cli", options(nostack, preserves_flags));
-    }
-
     loop {
         unsafe {
             asm!("hlt", options(nostack, preserves_flags));
