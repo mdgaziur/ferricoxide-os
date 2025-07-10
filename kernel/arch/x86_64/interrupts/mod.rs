@@ -6,6 +6,7 @@ use core::arch::asm;
 use lazy_static::lazy_static;
 use x86_64::instructions::interrupts;
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode};
+use crate::kprintf::QEMU_SERIAL;
 
 mod apic;
 mod ioapic;
@@ -45,6 +46,8 @@ extern "x86-interrupt" fn pagefault_handler(
     stack_frame: InterruptStackFrame,
     error_code: PageFaultErrorCode,
 ) {
+    // Nothing to do as of now as we don't have userspace and kernel space page fault recovery.
+    unsafe { QEMU_SERIAL.force_unlock(); }
     serial_println!("EXCEPTION: PAGE FAULT");
     serial_println!("Error code: {:?}", error_code);
     serial_println!("Stack frame: {:#?}", stack_frame);
