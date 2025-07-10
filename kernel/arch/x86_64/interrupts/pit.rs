@@ -9,7 +9,7 @@ use x86_64::structures::idt::InterruptStackFrame;
 pub const PIT_FREQUENCY: u32 = 1193182;
 pub const TIMER_VECTOR: u8 = 0x20;
 pub const TIMER_IRQ: u8 = 0x2;
-pub const TIMER_FREQUENCY: u32 = 100; // 1 kHz
+pub const TIMER_FREQUENCY: u32 = 100; // 100 Hz
 // FIXME: timer freq is twice as fast for some reason
 pub const TIMER_COUNT: u16 = (PIT_FREQUENCY / TIMER_FREQUENCY * 2) as _;
 static TICKS: AtomicU64 = AtomicU64::new(0);
