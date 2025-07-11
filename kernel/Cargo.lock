@@ -55,6 +55,7 @@ dependencies = [
  "lazy_static",
  "linked_list_allocator",
  "multiboot2",
+ "noto-sans-mono-bitmap",
  "spin 0.10.0",
  "uart_16550",
  "x86_64",
@@ -117,6 +118,12 @@ dependencies = [
  "derive_more",
  "ptr_meta",
 ]
+
+[[package]]
+name = "noto-sans-mono-bitmap"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1064d564ae026ae123bf5d607318b42a5b31d70a3c48e6ea7ee44cce4cdb095e"
 
 [[package]]
 name = "proc-macro2"

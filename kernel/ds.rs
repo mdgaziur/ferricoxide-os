@@ -15,6 +15,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
+use alloc::vec;
+use alloc::vec::Vec;
 
 /// # Statically allocated bit-map.
 ///
@@ -118,4 +120,57 @@ impl<const S: usize> Iterator for StaticBitMapIterator<'_, S> {
 
 pub const fn static_bitmap_size(size: usize) -> usize {
     size.div_ceil(64)
+}
+
+pub struct RingBuffer<T> {
+    storage: Vec<T>,
+    capacity: usize,
+    len: usize,
+    reader: usize,
+    writer: usize,
+}
+
+impl<T: Default + Clone> RingBuffer<T> {
+    pub fn new(capacity: usize) -> RingBuffer<T> {
+        Self {
+            storage: vec![T::default(); capacity],
+            capacity,
+            len: 0,
+            reader: 0,
+            writer: 0,
+        }
+    }
+
+    pub fn get(&mut self) -> Option<&T> {
+        if self.len == 0 {
+            return None
+        }
+
+        let current_val = &self.storage[self.reader];
+
+        self.reader += 1;
+        self.reader %= self.len;
+
+        Some(current_val)
+    }
+
+    pub fn insert(&mut self, value: T) {
+        if self.len < self.capacity {
+            self.len += 1;
+        }
+
+        self.storage[self.writer] = value;
+        
+        self.writer += 1;
+        self.writer %= self.capacity;
+    }
+
+    pub fn extend(&mut self, extend_by: usize) {
+        self.storage.reserve(extend_by);
+        self.capacity += extend_by;
+    }
+    
+    pub fn get_all(&self) -> &[T] {
+        &self.storage[..self.len]
+    }
 }

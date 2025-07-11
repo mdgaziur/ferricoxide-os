@@ -17,7 +17,7 @@
  */
 
 pub const ADDRESS_SPACE_SIZE: usize = 512 * GB;
-pub const KERNEL_STACK_SIZE: usize = 32 * KB;
+pub const KERNEL_STACK_SIZE: usize = 128 * KB;
 
 #[allow(unused)]
 pub const GB: usize = MB * 1024;
@@ -27,6 +27,8 @@ pub const MB: usize = KB * 1024;
 
 #[allow(unused)]
 pub const KB: usize = 1024;
+
+pub const DMESG_SIZE: usize = 4096;
 
 #[macro_export]
 macro_rules! verify_called_once {
