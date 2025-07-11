@@ -1,7 +1,7 @@
-use core::sync::atomic::{AtomicBool, Ordering};
-use spin::{Mutex, Once};
 use crate::display::framebuffer::Framebuffer;
 use crate::display::text_renderer::TextRenderer;
+use core::sync::atomic::{AtomicBool, Ordering};
+use spin::{Mutex, Once};
 
 pub mod framebuffer;
 mod text_renderer;
@@ -11,7 +11,7 @@ pub static TEXT_RENDERER: Once<Mutex<TextRenderer>> = Once::new();
 pub static USE_TEXT_RENDERER: AtomicBool = AtomicBool::new(true);
 
 /// Initializes everything necessary to show stuff in the display.
-/// 
+///
 /// # Safety:
 /// Check [`Framebuffer::new`]
 pub unsafe fn init() {
@@ -28,16 +28,10 @@ pub fn display_text(text: &str) {
 
 pub fn init_text_renderer() {
     let fb = FRAMEBUFFER.get().unwrap().lock();
-    TEXT_RENDERER.call_once(|| {
-        Mutex::new(TextRenderer::new(
-            fb.width as usize,
-            fb.height as usize,
-        ))
-    });
+    TEXT_RENDERER
+        .call_once(|| Mutex::new(TextRenderer::new(fb.width as usize, fb.height as usize)));
 }
 
 pub fn init_framebuffer() {
-    FRAMEBUFFER.call_once(|| {
-        Mutex::new(unsafe { Framebuffer::new() })
-    });
+    FRAMEBUFFER.call_once(|| Mutex::new(unsafe { Framebuffer::new() }));
 }

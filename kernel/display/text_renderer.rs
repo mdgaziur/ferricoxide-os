@@ -1,8 +1,8 @@
-use alloc::vec;
-use alloc::vec::Vec;
-use noto_sans_mono_bitmap::{get_raster, get_raster_width, FontWeight, RasterHeight};
 use crate::display::FRAMEBUFFER;
 use crate::display::framebuffer::Pixel;
+use alloc::vec;
+use alloc::vec::Vec;
+use noto_sans_mono_bitmap::{FontWeight, RasterHeight, get_raster, get_raster_width};
 
 const RASTER_SIZE: RasterHeight = RasterHeight::Size24;
 
@@ -56,9 +56,13 @@ impl TextRenderer {
         }
 
         let pixels = rasterized_char.raster();
-        for y in 0..pixels.len() {
-            for x in 0..pixels[y].len() {
-                fb.put_pixel(screen_x + x, screen_y + y, self.current_color.apply_intensity(pixels[y][x]));
+        for (y, _) in pixels.iter().enumerate() {
+            for (x, pixel) in pixels[y].iter().enumerate() {
+                fb.put_pixel(
+                    screen_x + x,
+                    screen_y + y,
+                    self.current_color.apply_intensity(*pixel),
+                );
             }
         }
 
@@ -87,7 +91,7 @@ struct ScreenCursor {
     cols: usize,
     x: usize,
     y: usize,
-    target_line_size: usize
+    target_line_size: usize,
 }
 
 impl ScreenCursor {
@@ -126,7 +130,7 @@ impl ScreenCursor {
             } else {
                 self.y += 1;
                 false
-            }
+            };
         }
 
         self.x += 1;

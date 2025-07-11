@@ -25,10 +25,10 @@ pub mod paging;
 use crate::arch::x86_64::mm::frame::FRAME_ALLOCATOR;
 use crate::arch::x86_64::mm::paging::flags::PageTableEntryFlags;
 use crate::arch::x86_64::mm::paging::{
-    identity_map_range, map_range, map_virtual_range, ActivePML4, InactivePML4, Page, TemporaryPage,
+    ActivePML4, InactivePML4, Page, TemporaryPage, identity_map_range, map_range, map_virtual_range,
 };
 use crate::kutils::MB;
-use crate::{serial_println, BOOT_INFO};
+use crate::{BOOT_INFO, serial_println};
 use linked_list_allocator::LockedHeap;
 use spin::{Mutex, Once};
 

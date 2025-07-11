@@ -143,7 +143,7 @@ impl<T: Default + Clone> RingBuffer<T> {
 
     pub fn get(&mut self) -> Option<&T> {
         if self.len == 0 {
-            return None
+            return None;
         }
 
         let current_val = &self.storage[self.reader];
@@ -160,7 +160,7 @@ impl<T: Default + Clone> RingBuffer<T> {
         }
 
         self.storage[self.writer] = value;
-        
+
         self.writer += 1;
         self.writer %= self.capacity;
     }
@@ -169,7 +169,7 @@ impl<T: Default + Clone> RingBuffer<T> {
         self.storage.reserve(extend_by);
         self.capacity += extend_by;
     }
-    
+
     pub fn get_all(&self) -> &[T] {
         &self.storage[..self.len]
     }

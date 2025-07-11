@@ -23,15 +23,15 @@ pub(super) mod interrupts;
 mod io;
 mod mm;
 
-use crate::kutils::{KernelContentInfo, KERNEL_STACK_SIZE};
-use crate::{display, kernel_main, serial_print, serial_println, BOOT_INFO};
+use crate::kutils::{KERNEL_STACK_SIZE, KernelContentInfo};
+use crate::{BOOT_INFO, display, kernel_main, serial_println};
 use core::arch::naked_asm;
 use core::ptr::addr_of;
 use multiboot2::{BootInformation, BootInformationHeader};
 use spin::Once;
 
-pub use cpu::halt_loop;
 use crate::dbg::dmesg_init;
+pub use cpu::halt_loop;
 
 pub(super) static KERNEL_CONTENT_INFO: Once<KernelContentInfo> = Once::new();
 
@@ -110,7 +110,9 @@ fn actually_kernel_start(
     mm::init();
     acpi::init();
     interrupts::init();
-    unsafe { display::init(); }
+    unsafe {
+        display::init();
+    }
     dmesg_init();
 
     kernel_main();

@@ -4,19 +4,17 @@
 extern crate alloc;
 
 mod arch;
+mod dbg;
+mod display;
 mod ds;
 mod kprintf;
 mod kutils;
-mod display;
-mod dbg;
 
-use core::panic::PanicInfo;
-use spin::Once;
-use multiboot2::BootInformation;
 use crate::arch::sleep;
-use crate::dbg::{dmesgln, dmesg_get_all, D_INFO};
-use crate::display::{FRAMEBUFFER, TEXT_RENDERER};
-use crate::display::framebuffer::Pixel;
+use crate::dbg::{D_INFO, dmesgln};
+use core::panic::PanicInfo;
+use multiboot2::BootInformation;
+use spin::Once;
 
 pub static BOOT_INFO: Once<BootInformation> = Once::new();
 
@@ -24,6 +22,13 @@ pub fn kernel_main() -> ! {
     // Previously we used serial_println, but starting from `kernel_main`, we will use
     // `dmesgln` to print kernel messages
     dmesgln(d!(D_INFO "Hello from Ferricoxide OS!"));
+
+    let mut secs = 0;
+    loop {
+        dmesgln(d!(D_INFO "Secs: {:0>4}", secs));
+        sleep(1000);
+        secs += 1;
+    }
 
     arch::halt_loop()
 }

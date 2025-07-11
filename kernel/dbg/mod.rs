@@ -1,11 +1,10 @@
-use alloc::string::{String, ToString};
-use alloc::vec::Vec;
-use spin::{Mutex, Once};
-use crate::arch::get_global_secs;
-use crate::{serial_print, serial_println};
 use crate::display::display_text;
 use crate::ds::RingBuffer;
 use crate::kutils::DMESG_SIZE;
+use crate::serial_print;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
+use spin::{Mutex, Once};
 
 pub static DMESG_RINGBUFFER: Once<Mutex<RingBuffer<String>>> = Once::new();
 pub const D_DEBUG: &str = "Debug";
@@ -26,16 +25,14 @@ pub fn dmesg_get_all() -> Vec<String> {
 }
 
 pub fn dmesg_init() {
-    DMESG_RINGBUFFER.call_once(|| {
-        Mutex::new(RingBuffer::new(DMESG_SIZE))
-    });
+    DMESG_RINGBUFFER.call_once(|| Mutex::new(RingBuffer::new(DMESG_SIZE)));
 }
 
 /// Prints to the host through the serial interface, appending a newline.
 #[macro_export]
 macro_rules! d {
     () => (format_args!("\n"));
-    ($level:ident $fmt:expr) => (format_args!(concat!("[{} {}] ", concat!($fmt, "\n")), $level, crate::arch::get_global_secs()));
+    ($level:ident $fmt:expr) => (format_args!(concat!("[{} {}] ", concat!($fmt, "\n")), $level, $crate::arch::get_global_secs()));
     ($level:ident $fmt:expr, $($arg:tt)*) => (format_args!(
-        concat!("[{} {}] ", concat!($fmt, "\n")), $level, crate::arch::get_global_secs(), $($arg)*));
+        concat!("[{} {}] ", concat!($fmt, "\n")), $level, $crate::arch::get_global_secs(), $($arg)*));
 }

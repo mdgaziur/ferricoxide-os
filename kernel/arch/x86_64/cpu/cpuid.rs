@@ -1,7 +1,7 @@
 use crate::serial_println;
 use bitflags::bitflags;
 use core::arch::asm;
-use core::arch::x86_64::{__cpuid, __cpuid_count};
+use core::arch::x86_64::__cpuid;
 
 bitflags! {
     #[derive(Debug, Copy, Clone)]
@@ -115,9 +115,7 @@ pub fn cpuid_get_vendor(vendor: &mut [u8; 13]) {
 }
 
 pub fn cpuid_getfeatures() -> (CPUIDECXFeature, CPUIDEDXFeature) {
-    let res = unsafe {
-        __cpuid(1)
-    };
+    let res = unsafe { __cpuid(1) };
 
     (
         CPUIDECXFeature::from_bits(res.ecx).unwrap(),
@@ -133,17 +131,11 @@ pub struct ProcessorFreqInfo {
 }
 
 pub fn cpuid_core_crystal_freq() -> ProcessorFreqInfo {
-    let denominator: u32;
-    let numerator: u32;
-    let core_crystal_clock_freq: u32;
+    let res = unsafe { __cpuid(0x15) };
 
-    let res = unsafe {
-        __cpuid(0x15)
-    };
-
-    denominator = res.eax;
-    numerator = res.ebx;
-    core_crystal_clock_freq = res.ecx;
+    let denominator: u32 = res.eax;
+    let numerator: u32 = res.ebx;
+    let core_crystal_clock_freq: u32 = res.ecx;
 
     serial_println!(
         "CPUID core crystal clock freq: denominator: {}, numerator: {}, core_crystal_clock_freq: {}",
