@@ -16,7 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 use crate::arch::x86_64::mm::frame::{Frame, FrameAllocator};
-use crate::arch::x86_64::{BOOT_INFO, KERNEL_CONTENT_INFO, STACKOVERFLOW_GUARD};
+use crate::arch::x86_64::{KERNEL_CONTENT_INFO, STACKOVERFLOW_GUARD};
 use core::cmp::max;
 use core::ptr::addr_of;
 mod frame;
@@ -25,10 +25,10 @@ pub mod paging;
 use crate::arch::x86_64::mm::frame::FRAME_ALLOCATOR;
 use crate::arch::x86_64::mm::paging::flags::PageTableEntryFlags;
 use crate::arch::x86_64::mm::paging::{
-    ActivePML4, InactivePML4, Page, TemporaryPage, identity_map_range, map_range, map_virtual_range,
+    identity_map_range, map_range, map_virtual_range, ActivePML4, InactivePML4, Page, TemporaryPage,
 };
 use crate::kutils::MB;
-use crate::serial_println;
+use crate::{serial_println, BOOT_INFO};
 use linked_list_allocator::LockedHeap;
 use spin::{Mutex, Once};
 

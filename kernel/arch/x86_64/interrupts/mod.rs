@@ -1,16 +1,17 @@
 use crate::arch::x86_64::cpu::halt_loop;
 use crate::arch::x86_64::gdt::DOUBLE_FAULT_IST_INDEX;
-use crate::arch::x86_64::interrupts::pit::{TIMER_VECTOR, pit_handler, pit_sleep};
+use crate::arch::x86_64::interrupts::pit8254::{TIMER_VECTOR, pit_handler, pit_sleep};
 use crate::serial_println;
 use core::arch::asm;
 use lazy_static::lazy_static;
 use x86_64::instructions::interrupts;
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode};
+use crate::arch::x86_64::io::{inb, outb};
 use crate::kprintf::QEMU_SERIAL;
 
 mod apic;
 mod ioapic;
-mod pit;
+pub mod pit8254;
 
 lazy_static! {
     pub static ref IDT: InterruptDescriptorTable = {
@@ -82,6 +83,30 @@ pub fn sleep(millis: u64) {
     pit_sleep(millis);
 }
 
+fn nmi_enable() {
+    unsafe {
+        outb(0x70, inb(0x70) & 0x7F);
+        inb(0x71);
+    }
+}
+
+fn nmi_disable() {
+    unsafe {
+        outb(0x70, inb(0x70) | 0x80);
+        inb(0x71);
+    }
+}
+
+pub fn enable_interrupts() {
+    interrupts::enable();
+    nmi_enable();
+}
+
+pub fn disable_interrupts() {
+    interrupts::disable();
+    nmi_disable();
+}
+
 pub fn init() {
     mask_pic();
 
@@ -89,7 +114,7 @@ pub fn init() {
 
     apic::init();
     ioapic::init();
-    pit::init();
+    pit8254::init();
 
-    interrupts::enable();
+    enable_interrupts();
 }

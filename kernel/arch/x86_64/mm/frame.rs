@@ -16,10 +16,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 use crate::arch::x86_64::mm::PhysAddr;
-use crate::arch::x86_64::{BOOT_INFO, KERNEL_CONTENT_INFO, mm};
-use crate::ds::{StaticBitmap, static_bitmap_size};
+use crate::arch::x86_64::{mm, KERNEL_CONTENT_INFO};
+use crate::ds::{static_bitmap_size, StaticBitmap};
 use crate::kutils::{ADDRESS_SPACE_SIZE, KB, MB};
-use crate::{serial_println, verify_called_once};
+use crate::{serial_println, verify_called_once, BOOT_INFO};
 use multiboot2::MemoryAreaType;
 use spin::Mutex;
 

@@ -3,7 +3,7 @@
 
 pub mod apic;
 
-use crate::arch::x86_64::BOOT_INFO;
+use crate::BOOT_INFO;
 use crate::arch::x86_64::acpi::apic::APICSDT;
 use crate::arch::x86_64::mm::paging::flags::PageTableEntryFlags;
 use crate::arch::x86_64::mm::{PhysAddr, VirtAddr, identity_map, translate_addr};

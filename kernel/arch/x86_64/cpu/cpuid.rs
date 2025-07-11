@@ -136,11 +136,11 @@ pub fn cpuid_core_crystal_freq() -> ProcessorFreqInfo {
     let denominator: u32;
     let numerator: u32;
     let core_crystal_clock_freq: u32;
-    
+
     let res = unsafe {
         __cpuid(0x15)
     };
-    
+
     denominator = res.eax;
     numerator = res.ebx;
     core_crystal_clock_freq = res.ecx;

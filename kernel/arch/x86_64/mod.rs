@@ -19,21 +19,20 @@
 mod acpi;
 mod cpu;
 mod gdt;
-mod interrupts;
+pub(super) mod interrupts;
 mod io;
 mod mm;
 
-use crate::kutils::{KERNEL_STACK_SIZE, KernelContentInfo};
-use crate::{serial_print, serial_println};
+use crate::kutils::{KernelContentInfo, KERNEL_STACK_SIZE};
+use crate::{display, kernel_main, serial_print, serial_println, BOOT_INFO};
 use core::arch::naked_asm;
 use core::ptr::addr_of;
 use multiboot2::{BootInformation, BootInformationHeader};
 use spin::Once;
 
-use crate::arch::x86_64::interrupts::sleep;
 pub use cpu::halt_loop;
+use crate::dbg::dmesg_init;
 
-pub(super) static BOOT_INFO: Once<BootInformation> = Once::new();
 pub(super) static KERNEL_CONTENT_INFO: Once<KernelContentInfo> = Once::new();
 
 #[unsafe(link_section = ".kernel_stack")]
@@ -111,20 +110,8 @@ fn actually_kernel_start(
     mm::init();
     acpi::init();
     interrupts::init();
+    unsafe { display::init(); }
+    dmesg_init();
 
-    let mut sec = 0;
-    loop {
-        serial_print!("\rSecs: {:0>5}", sec);
-        sec += 1;
-        
-        if sec <= 10 {
-            sleep(1000);
-        } else {
-            break;
-        }
-    }
-    serial_println!();
-    serial_println!("10 seconds sleep done");
-
-    halt_loop();
+    kernel_main();
 }

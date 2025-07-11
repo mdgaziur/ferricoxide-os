@@ -54,6 +54,10 @@ pub fn pit_sleep(millis: u64) {
     }
 }
 
+pub fn get_global_ms() -> u64 {
+    TICKS.load(Ordering::Relaxed) 
+}
+
 pub fn init() {
     if PIT_FREQUENCY % TIMER_FREQUENCY > TIMER_FREQUENCY / 2 {
         set_pit_count(TIMER_COUNT + 1);

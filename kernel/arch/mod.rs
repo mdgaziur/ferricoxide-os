@@ -21,3 +21,17 @@ mod x86_64;
 
 #[cfg(target_arch = "x86_64")]
 pub use x86_64::*;
+
+pub fn get_global_ms() -> u64 {
+    #[cfg(target_arch = "x86_64")]
+    interrupts::pit8254::get_global_ms()
+}
+
+pub fn get_global_secs() -> f64 {
+    get_global_ms() as f64 / 1000_f64
+}
+
+pub fn sleep(millis: u64) {
+    #[cfg(target_arch = "x86_64")]
+    interrupts::pit8254::pit_sleep(millis);
+}
