@@ -29,10 +29,10 @@ pub fn read_pit_count() -> u16 {
 pub fn set_pit_count(count: u16) {
     without_interrupts(|| unsafe {
         let mut command = 0;
-        command |= 0; // BCD/Binary mode: Binary mode
-        command |= 010 << 1; // Operating mode: Square wave generator
-        command |= 11 << 4; // Access mode: lobyte/hibyte
-        command |= 00 << 5; // Channel select: Channel 0
+        command |= 0b0; // BCD/Binary mode: Binary mode
+        command |= 0b010 << 1; // Operating mode: Square wave generator
+        command |= 0b11 << 4; // Access mode: lobyte/hibyte
+        command |= 0b00 << 5; // Channel select: Channel 0
         outb(0x43, command);
         outb(0x40, (count & 0xFF) as u8);
         outb(0x40, ((count & 0xFF00) >> 8) as u8);
@@ -55,7 +55,7 @@ pub fn pit_sleep(millis: u64) {
 }
 
 pub fn get_global_ms() -> u64 {
-    TICKS.load(Ordering::Relaxed) 
+    TICKS.load(Ordering::Relaxed)
 }
 
 pub fn init() {
