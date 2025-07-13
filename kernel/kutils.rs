@@ -17,11 +17,10 @@
  */
 
 pub const ADDRESS_SPACE_SIZE: usize = 512 * GB;
-pub const KERNEL_STACK_SIZE: usize = 128 * KB;
+pub const KERNEL_STACK_SIZE: usize = 16 * MB;
 
 #[allow(unused)]
 pub const GB: usize = MB * 1024;
-
 #[allow(unused)]
 pub const MB: usize = KB * 1024;
 

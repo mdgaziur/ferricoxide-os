@@ -2,10 +2,11 @@
 
 use crate::arch::x86_64::cpu::cpuid::{CPUIDEDXFeature, cpuid_getfeatures};
 use crate::arch::x86_64::mm::paging::flags::PageTableEntryFlags;
-use crate::arch::x86_64::mm::{PhysAddr, identity_map};
+use crate::arch::x86_64::mm::{PhysAddr, identity_map, allocate_page_and_map};
 use crate::serial_println;
 use spin::Once;
 use x86_64::registers::model_specific::Msr;
+use crate::arch::x86_64::mm::paging::PAGE_SIZE;
 
 const IA32_APIC_BASE_MSR: u32 = 0x1B;
 const EOI_REG: u32 = 0xB0;
@@ -74,13 +75,14 @@ pub fn init() {
 
     // Hardware enable APIC if not enabled already
     let apic_base = get_apic_base();
-    identity_map(
+    let virtual_apic_base = allocate_page_and_map(
         apic_base as PhysAddr,
+        PAGE_SIZE,
         PageTableEntryFlags::PRESENT
             | PageTableEntryFlags::WRITABLE
             | PageTableEntryFlags::DISABLE_CACHE,
-    );
-    serial_println!("APIC base: {:x?}", apic_base);
+    ).unwrap().1;
+    serial_println!("APIC base: {:x?}", virtual_apic_base);
     // Safety:
     // We're just setting the APIC base address to the value we just read
     unsafe {
@@ -91,11 +93,11 @@ pub fn init() {
     // We're using the APIC base address we just set
     unsafe {
         write_reg_apic(
-            apic_base,
+            virtual_apic_base as u64,
             SPURIOUS_INTERRUPT_VECTOR_REG,
-            read_reg_apic(apic_base, SPURIOUS_INTERRUPT_VECTOR_REG) | 0x100,
+            read_reg_apic(virtual_apic_base as u64, SPURIOUS_INTERRUPT_VECTOR_REG) | 0x100,
         );
     }
 
-    APIC_BASE.call_once(|| apic_base);
+    APIC_BASE.call_once(|| virtual_apic_base as u64);
 }

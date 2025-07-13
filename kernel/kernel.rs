@@ -9,6 +9,8 @@ mod display;
 mod ds;
 mod kprintf;
 mod kutils;
+mod fs;
+mod process;
 
 use crate::arch::sleep;
 use crate::dbg::{D_INFO, dmesgln};

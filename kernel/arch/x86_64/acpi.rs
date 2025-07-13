@@ -3,18 +3,20 @@
 
 pub mod apic;
 
-use crate::BOOT_INFO;
+use crate::{dbg, BOOT_INFO};
 use crate::arch::x86_64::acpi::apic::APICSDT;
 use crate::arch::x86_64::mm::paging::flags::PageTableEntryFlags;
-use crate::arch::x86_64::mm::{PhysAddr, VirtAddr, identity_map, translate_addr};
+use crate::arch::x86_64::mm::{PhysAddr, VirtAddr, identity_map, translate_addr, allocate_page_and_map};
 use crate::serial_println;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::slice;
 use spin::Mutex;
+use crate::arch::x86_64::mm::paging::PAGE_SIZE;
 
 pub static SDT_LIST: Mutex<Vec<ACPISDT>> = Mutex::new(Vec::new());
 
+#[derive(Debug)]
 #[repr(C, packed)]
 pub struct RawACPISDTHeader {
     signature: u32,
@@ -26,7 +28,7 @@ pub struct RawACPISDTHeader {
     oem_revision: u32,
     creator_id: u32,
     creator_revision: u32,
-    first_entry: u64,
+    first_entry: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -51,7 +53,8 @@ pub enum ACPISDT {
 /// Safety:
 /// Make sure that the pointer is valid
 unsafe fn enumerate_xsdt(root_xsdt_ptr: *const RawACPISDTHeader) {
-    identity_map(root_xsdt_ptr as PhysAddr, PageTableEntryFlags::PRESENT);
+    let root_xsdt_ptr = allocate_page_and_map(root_xsdt_ptr as PhysAddr, PAGE_SIZE, PageTableEntryFlags::PRESENT)
+        .unwrap().1 as *const RawACPISDTHeader;
 
     let root_xsdt = unsafe { &*root_xsdt_ptr };
     let entries_count = (root_xsdt.length - size_of::<RawACPISDTHeader>() as u32) as usize / 8 + 1;
@@ -60,9 +63,10 @@ unsafe fn enumerate_xsdt(root_xsdt_ptr: *const RawACPISDTHeader) {
 
     let mut sdt_list = SDT_LIST.lock();
     for sdt_ptr in sdt_ptrs {
-        identity_map(*sdt_ptr as PhysAddr, PageTableEntryFlags::PRESENT);
+        let sdt_ptr = allocate_page_and_map(*sdt_ptr as PhysAddr, PAGE_SIZE, PageTableEntryFlags::PRESENT)
+            .unwrap().1 as *const RawACPISDTHeader;
 
-        let current_raw_sdt = unsafe { &*(*sdt_ptr as *const RawACPISDTHeader) };
+        let current_raw_sdt = unsafe { &*sdt_ptr };
         let current_sdt = ACPISDTHeader {
             signature: str::from_utf8(&current_raw_sdt.signature.to_le_bytes())
                 .unwrap()
@@ -79,7 +83,7 @@ unsafe fn enumerate_xsdt(root_xsdt_ptr: *const RawACPISDTHeader) {
                 .unwrap()
                 .to_string(),
             creator_revision: current_raw_sdt.creator_revision,
-            raw_addr: *sdt_ptr as PhysAddr,
+            raw_addr: sdt_ptr as PhysAddr,
         };
 
         match &*current_sdt.signature {

@@ -22,11 +22,94 @@ use crate::arch::x86_64::mm::{PhysAddr, VirtAddr, align_up};
 use core::fmt::{Debug, Formatter};
 use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut, Index, IndexMut};
+use crate::ds::{static_bitmap_size, StaticBitmap};
+use crate::kutils::ADDRESS_SPACE_SIZE;
+use crate::serial_println;
 
 pub mod flags;
 
 pub const PAGE_SIZE: usize = FRAME_SIZE;
 const PML4_ADDR: *mut PageTable<P4> = 0xffff_ff7f_bfdf_e000 as *mut _;
+pub const PAGE_COUNT: usize = ADDRESS_SPACE_SIZE / PAGE_SIZE;
+
+pub struct KernelPageAllocator {
+    bit_map: StaticBitmap<{ static_bitmap_size(PAGE_COUNT) }>,
+    start_addr: VirtAddr,
+}
+
+impl KernelPageAllocator {
+    pub fn new(start_addr: VirtAddr) -> Self {
+        Self {
+            bit_map: StaticBitmap::new(),
+            start_addr,
+        }
+    }
+
+    pub fn allocate_page(&mut self) -> Option<VirtAddr> {
+        let mut free_page_idx = None;
+        for (idx, bit) in self.bit_map.iter().enumerate() {
+            if !bit {
+                free_page_idx = Some(idx);
+            }
+        }
+
+        if let Some(idx) = free_page_idx {
+            self.bit_map.set(idx);
+            Some(self.start_addr + PAGE_SIZE * idx)
+        } else {
+            None
+        }
+    }
+
+    pub fn allocate_consecutive(&mut self, size: usize) -> Option<(usize, VirtAddr)> {
+        let aligned_size = align_up(size, PAGE_SIZE);
+        let target_page_count = aligned_size / PAGE_SIZE;
+
+        if target_page_count == 0 {
+            return None;
+        }
+
+        let mut start_idx: VirtAddr = 0;
+        let mut found = false;
+        let mut current_page_count = 0;
+        for (idx, bit) in self.bit_map.iter().enumerate() {
+            if !bit {
+                if current_page_count == 0 {
+                    start_idx = idx;
+                }
+
+                current_page_count += 1;
+            } else {
+                current_page_count = 0;
+            }
+
+            if current_page_count == target_page_count {
+                found = true;
+                break;
+            }
+        }
+
+        if found {
+            for idx in start_idx..start_idx + target_page_count {
+                self.bit_map.set(idx);
+            }
+            
+            Some((aligned_size, self.start_addr + PAGE_SIZE * start_idx))
+        } else {
+            None
+        }
+    }
+
+    pub fn free_page(&mut self, addr: VirtAddr, size: usize) {
+        assert_eq!(addr % PAGE_SIZE, 0, "A valid page address returned by `KernelPageAllocator` is always divisible by `PAGE_SIZE`");
+        assert_eq!(size % PAGE_SIZE, 0, "Size must be a multiple of `PAGE_SIZE`");
+
+        for idx in 0..size / PAGE_SIZE {
+            self.bit_map.clear(addr / PAGE_SIZE + idx);
+            debug_assert!(self.bit_map.get(addr / PAGE_SIZE + idx), "Attempt to free page which was not allocated");
+        }
+    }
+}
 
 pub struct ActivePML4<'a> {
     pub mapper: Mapper<'a>,
@@ -603,7 +686,7 @@ pub fn map_range(
         n += 1;
     }
 
-    n * PAGE_SIZE
+    virt_start + size
 }
 
 pub fn map_virtual_range(
@@ -627,7 +710,7 @@ pub fn map_virtual_range(
         n += 1;
     }
 
-    n * PAGE_SIZE
+    virt_start + size
 }
 
 pub fn identity_map_range(
@@ -651,5 +734,5 @@ pub fn identity_map_range(
         n += 1;
     }
 
-    n * PAGE_SIZE
+    phys_start + size
 }

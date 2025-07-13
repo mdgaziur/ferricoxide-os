@@ -114,6 +114,7 @@ fn actually_kernel_start(
         display::init();
     }
     dmesg_init();
-
+    
     kernel_main();
+    loop {}
 }

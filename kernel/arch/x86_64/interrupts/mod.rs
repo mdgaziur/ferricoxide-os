@@ -62,6 +62,10 @@ extern "x86-interrupt" fn double_fault_handler(
     stack_frame: InterruptStackFrame,
     error_code: u64,
 ) -> ! {
+    // We got a double fault, the system is borked anyway!
+    unsafe {
+        QEMU_SERIAL.force_unlock();
+    }
     serial_println!("EXCEPTION: DOUBLE FAULT");
     serial_println!("Stack frame: {:#?}", stack_frame);
     serial_println!("Error code: {}", error_code);
