@@ -8,20 +8,24 @@ use spin::Once;
 use crate::arch::x86_64::mm::paging::PAGE_SIZE;
 
 static IOAPIC_BASE: Once<VirtAddr> = Once::new();
+const IOREGSEL: usize = 0;
+const IOREGWIN: usize = 0x10;
+const FIRST_IRQ_INDEX: u32 = 0x10;
+const FIRST_IRQ_INDEX_2: u32 = 0x11;
 
 pub fn ioapic_write(reg: u32, value: u32) {
     let ioapic_base = *IOAPIC_BASE.get().unwrap();
     unsafe {
-        core::ptr::write_volatile(ioapic_base as *mut u32, reg);
-        core::ptr::write_volatile((ioapic_base + 0x10) as *mut u32, value);
+        core::ptr::write_volatile((ioapic_base + IOREGSEL) as *mut u32, reg);
+        core::ptr::write_volatile((ioapic_base + IOREGWIN) as *mut u32, value);
     }
 }
 
 pub fn ioapic_read(reg: u32) -> u32 {
     let ioapic_base = *IOAPIC_BASE.get().unwrap();
     unsafe {
-        core::ptr::write_volatile(ioapic_base as *mut u32, reg);
-        core::ptr::read_volatile((ioapic_base + 0x10) as *const u32)
+        core::ptr::write_volatile((ioapic_base + IOREGSEL) as *mut u32, reg);
+        core::ptr::read_volatile((ioapic_base + IOREGWIN) as *const u32)
     }
 }
 
@@ -30,8 +34,8 @@ pub fn set_ioapic_irq(irq: u8, vector: u8, lapic_id: u8) {
     let low = (vector as u32) & 0xFF;
     let high = (lapic_id as u32) << 24;
 
-    ioapic_write(0x10 + index + 1, high); // Set destination field
-    ioapic_write(0x10 + index, low); // Set vector and flags
+    ioapic_write(FIRST_IRQ_INDEX_2 + index, high); // Set destination field
+    ioapic_write(FIRST_IRQ_INDEX + index, low); // Set vector and flags
 }
 
 pub fn init() {
