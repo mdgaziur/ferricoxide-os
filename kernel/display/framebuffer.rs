@@ -141,6 +141,10 @@ impl<'fb> Framebuffer<'fb> {
         for i in bytes..self.second_buffer.len() {
             self.second_buffer[i - bytes] = self.second_buffer[i];
         }
+
+        for i in self.second_buffer.len() - bytes..self.second_buffer.len() {
+            self.second_buffer[i] = 0;
+        }
     }
 
     pub fn flush(&mut self) {
