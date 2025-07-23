@@ -12,7 +12,7 @@ mod kutils;
 mod fs;
 mod process;
 
-use crate::arch::sleep;
+use crate::arch::{get_global_secs, sleep};
 use crate::dbg::{D_INFO, dmesgln};
 use core::panic::PanicInfo;
 use multiboot2::BootInformation;
@@ -25,11 +25,9 @@ pub fn kernel_main() -> ! {
     // `dmesgln` to print kernel messages
     dmesgln(d!(D_INFO "Hello from Ferricoxide OS!"));
 
-    let mut secs = 0;
     loop {
-        dmesgln(d!(D_INFO "Secs: {:0>4}", secs));
+        dmesgln(d!(D_INFO "Secs: {:0>4}", get_global_secs()));
         sleep(1000);
-        secs += 1;
     }
 
     arch::halt_loop()
