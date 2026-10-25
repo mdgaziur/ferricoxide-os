@@ -1,4 +1,4 @@
-ENTRY(start)
+ENTRY(kernel_start)
 
 SECTIONS {
     . = 0xFFFFFFFF80000000;
@@ -7,15 +7,15 @@ SECTIONS {
     {
         *(.text.kernel_start)
         *(.text .text.*)
-        . = ALIGN(4K);
+        . = ALIGN(2M);
     }
 
-    .kernel_stack : ALIGN(4K)
+    .kernel_stack : ALIGN(2M)
     {
         *(.kernel_stack)
     }
 
-    .stackoverflow_guard : ALIGN(4K)
+    .stackoverflow_guard : ALIGN(2M)
     {
         *(.stackoverflow_guard)
     }
@@ -23,18 +23,18 @@ SECTIONS {
     .rodata :
     {
         *(.rodata .rodata.*)
-        . = ALIGN(4K);
+        . = ALIGN(2M);
     }
 
     .data :
     {
         *(.data .data.*)
-        . = ALIGN(4K);
+        . = ALIGN(2M);
     }
 
     .bss :
     {
         *(.bss .bss.*)
-        . = ALIGN(4K);
+        . = ALIGN(2M);
     }
 }

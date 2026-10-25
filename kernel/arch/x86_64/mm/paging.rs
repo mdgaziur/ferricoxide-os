@@ -19,12 +19,11 @@ use crate::arch::x86_64::cpu::{flush_tlb, flush_tlb_all, read_cr3, write_cr3};
 use crate::arch::x86_64::mm::frame::{FRAME_SIZE, Frame, FrameAllocator};
 use crate::arch::x86_64::mm::paging::flags::PageTableEntryFlags;
 use crate::arch::x86_64::mm::{PhysAddr, VirtAddr, align_up};
+use crate::ds::{StaticBitmap, static_bitmap_size};
+use crate::kutils::ADDRESS_SPACE_SIZE;
 use core::fmt::{Debug, Formatter};
 use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut, Index, IndexMut};
-use crate::ds::{static_bitmap_size, StaticBitmap};
-use crate::kutils::ADDRESS_SPACE_SIZE;
-use crate::serial_println;
 
 pub mod flags;
 
@@ -93,7 +92,7 @@ impl KernelPageAllocator {
             for idx in start_idx..start_idx + target_page_count {
                 self.bit_map.set(idx);
             }
-            
+
             Some((aligned_size, self.start_addr + PAGE_SIZE * start_idx))
         } else {
             None
@@ -101,12 +100,23 @@ impl KernelPageAllocator {
     }
 
     pub fn free_page(&mut self, addr: VirtAddr, size: usize) {
-        assert_eq!(addr % PAGE_SIZE, 0, "A valid page address returned by `KernelPageAllocator` is always divisible by `PAGE_SIZE`");
-        assert_eq!(size % PAGE_SIZE, 0, "Size must be a multiple of `PAGE_SIZE`");
+        assert_eq!(
+            addr % PAGE_SIZE,
+            0,
+            "A valid page address returned by `KernelPageAllocator` is always divisible by `PAGE_SIZE`"
+        );
+        assert_eq!(
+            size % PAGE_SIZE,
+            0,
+            "Size must be a multiple of `PAGE_SIZE`"
+        );
 
         for idx in 0..size / PAGE_SIZE {
             self.bit_map.clear(addr / PAGE_SIZE + idx);
-            debug_assert!(self.bit_map.get(addr / PAGE_SIZE + idx), "Attempt to free page which was not allocated");
+            debug_assert!(
+                self.bit_map.get(addr / PAGE_SIZE + idx),
+                "Attempt to free page which was not allocated"
+            );
         }
     }
 }
@@ -204,27 +214,27 @@ impl<'a> Mapper<'a> {
             pdpt.and_then(|pdpt| {
                 let pdpt_entry = &pdpt[page.pdpt_index()];
                 // 1GiB page?
-                if let Some(start_frame) = pdpt_entry.pointed_frame() {
-                    if pdpt_entry.flags().contains(PageTableEntryFlags::HUGE_PAGE) {
-                        assert_eq!(start_frame.number % (512 * 512), 0);
-                        return Some(Frame {
-                            number: start_frame.number + page.pdt_index() * 512 + page.pt_index(),
-                        });
-                    }
+                if let Some(start_frame) = pdpt_entry.pointed_frame()
+                    && pdpt_entry.flags().contains(PageTableEntryFlags::HUGE_PAGE)
+                {
+                    assert_eq!(start_frame.number % (512 * 512), 0);
+                    return Some(Frame {
+                        number: start_frame.number + page.pdt_index() * 512 + page.pt_index(),
+                    });
                 }
 
                 if let Some(pdt) = pdpt.next_table(page.pdpt_index()) {
                     let pdt_entry = &pdt[page.pdt_index()];
 
                     // 2GiB page?
-                    if let Some(start_frame) = pdt_entry.pointed_frame() {
-                        if pdt_entry.flags().contains(PageTableEntryFlags::HUGE_PAGE) {
-                            // address must be 2MiB aligned
-                            assert_eq!(start_frame.number % 512, 0);
-                            return Some(Frame {
-                                number: start_frame.number + page.pt_index(),
-                            });
-                        }
+                    if let Some(start_frame) = pdt_entry.pointed_frame()
+                        && pdt_entry.flags().contains(PageTableEntryFlags::HUGE_PAGE)
+                    {
+                        // address must be 2MiB aligned
+                        assert_eq!(start_frame.number % 512, 0);
+                        return Some(Frame {
+                            number: start_frame.number + page.pt_index(),
+                        });
                     }
                 }
 
@@ -675,7 +685,7 @@ pub fn map_range(
 
     let size = align_up(size, PAGE_SIZE);
     let mut n = 0;
-    while n * PAGE_SIZE <= size {
+    while n * PAGE_SIZE < size {
         mapper.map_to(
             Page::containing_address(virt_start + n * PAGE_SIZE),
             Frame::containing_address(phys_start + n * PAGE_SIZE),
@@ -700,7 +710,7 @@ pub fn map_virtual_range(
 
     let size = align_up(size, PAGE_SIZE);
     let mut n = 0;
-    while n * PAGE_SIZE <= size {
+    while n * PAGE_SIZE < size {
         mapper.map(
             Page::containing_address(virt_start + n * PAGE_SIZE),
             flags,
@@ -724,7 +734,7 @@ pub fn identity_map_range(
 
     let size = align_up(size, PAGE_SIZE);
     let mut n = 0;
-    while n * PAGE_SIZE <= size {
+    while n * PAGE_SIZE < size {
         mapper.identity_map(
             Frame::containing_address(phys_start + n * PAGE_SIZE),
             flags,

@@ -115,7 +115,7 @@ pub fn cpuid_get_vendor(vendor: &mut [u8; 13]) {
 }
 
 pub fn cpuid_getfeatures() -> (CPUIDECXFeature, CPUIDEDXFeature) {
-    let res = unsafe { __cpuid(1) };
+    let res = __cpuid(1);
 
     (
         CPUIDECXFeature::from_bits(res.ecx).unwrap(),
@@ -131,7 +131,7 @@ pub struct ProcessorFreqInfo {
 }
 
 pub fn cpuid_core_crystal_freq() -> ProcessorFreqInfo {
-    let res = unsafe { __cpuid(0x15) };
+    let res = __cpuid(0x15);
 
     let denominator: u32 = res.eax;
     let numerator: u32 = res.ebx;

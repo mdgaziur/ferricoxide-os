@@ -9,6 +9,9 @@ crate-type = ["staticlib"]
 test = false
 bench = false
 
+[profile.release]
+debug = true
+
 [dependencies]
 multiboot2 = { version = "0.23.1", default-features = false }
 lazy_static = { version = "1.5.0", features = ["spin_no_std"] }
@@ -17,4 +20,5 @@ uart_16550 = "0.3.1"
 bitflags = "2.8.0"
 linked_list_allocator = "0.10.5"
 x86_64 = "0.15.2"
-noto-sans-mono-bitmap = { version = "0.3.1", features = ["size_24"] }
+noto-sans-mono-bitmap = { version = "0.3.1", features = ["size_24", "bold", "light"] }
+hashbrown = { version = "0.16.0", features = ["inline-more"] }

@@ -20,6 +20,10 @@ pub fn dmesgln(msg: core::fmt::Arguments) {
     DMESG_RINGBUFFER.get().unwrap().lock().insert(msg_str);
 }
 
+pub fn is_dmesg_available() -> bool {
+    DMESG_RINGBUFFER.get().is_some()
+}
+
 pub fn dmesg_get_all() -> Vec<String> {
     DMESG_RINGBUFFER.get().unwrap().lock().get_all().to_vec()
 }
@@ -28,11 +32,10 @@ pub fn dmesg_init() {
     DMESG_RINGBUFFER.call_once(|| Mutex::new(RingBuffer::new(DMESG_SIZE)));
 }
 
-/// Prints to the host through the serial interface, appending a newline.
 #[macro_export]
 macro_rules! d {
     () => (format_args!("\n"));
-    ($level:ident $fmt:expr) => (format_args!(concat!("[{} {}] ", concat!($fmt, "\n")), $level, $crate::arch::get_global_secs()));
+    ($level:ident $fmt:expr) => (format_args!(concat!("[{:<9} {:.3}] ", concat!($fmt, "\n")), $level, $crate::arch::get_global_secs()));
     ($level:ident $fmt:expr, $($arg:tt)*) => (format_args!(
-        concat!("[{} {}] ", concat!($fmt, "\n")), $level, $crate::arch::get_global_secs(), $($arg)*));
+        concat!("[{:<9} {:.3}] ", concat!($fmt, "\n")), $level, $crate::arch::get_global_secs(), $($arg)*));
 }

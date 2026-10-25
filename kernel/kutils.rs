@@ -18,6 +18,7 @@
 
 pub const ADDRESS_SPACE_SIZE: usize = 512 * GB;
 pub const KERNEL_STACK_SIZE: usize = 32 * MB;
+pub const MAX_SYMLINKS: usize = 128;
 
 #[allow(unused)]
 pub const GB: usize = MB * 1024;

@@ -60,16 +60,17 @@ pub fn get_global_ms() -> u64 {
 
 pub fn init() {
     EFFECTIVE_TIMER_FREQUENCY.call_once(|| {
-        PIT_FREQUENCY / (if PIT_FREQUENCY % TIMER_FREQUENCY > TIMER_FREQUENCY / 2 {
-            set_pit_count(TIMER_COUNT + 1);
-            
-            TIMER_COUNT + 1
-        } else {
-            set_pit_count(TIMER_COUNT);
-            
-            TIMER_COUNT
-        }) as u32
+        PIT_FREQUENCY
+            / (if PIT_FREQUENCY % TIMER_FREQUENCY > TIMER_FREQUENCY / 2 {
+                set_pit_count(TIMER_COUNT + 1);
+
+                TIMER_COUNT + 1
+            } else {
+                set_pit_count(TIMER_COUNT);
+
+                TIMER_COUNT
+            }) as u32
     });
-    
+
     set_ioapic_irq(TIMER_IRQ, TIMER_VECTOR, 0);
 }

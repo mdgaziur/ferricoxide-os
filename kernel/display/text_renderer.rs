@@ -4,7 +4,8 @@ use alloc::vec;
 use alloc::vec::Vec;
 use noto_sans_mono_bitmap::{FontWeight, RasterHeight, get_raster, get_raster_width};
 
-const RASTER_SIZE: RasterHeight = RasterHeight::Size24;
+const RASTER_SIZE: RasterHeight = RasterHeight::Size16;
+const FONT_WEIGHT: FontWeight = FontWeight::Bold;
 
 #[derive(Debug)]
 pub struct TextRenderer {
@@ -18,7 +19,7 @@ pub struct TextRenderer {
 
 impl TextRenderer {
     pub fn new(screen_width: usize, screen_height: usize) -> TextRenderer {
-        let char_width = get_raster_width(FontWeight::Regular, RASTER_SIZE) as u8;
+        let char_width = get_raster_width(FONT_WEIGHT, RASTER_SIZE) as u8;
         let char_height = RASTER_SIZE.val() as u8;
 
         let cols = screen_width / char_width as usize;
@@ -49,10 +50,10 @@ impl TextRenderer {
         }
 
         let rasterized_char;
-        if let Some(res) = get_raster(c, FontWeight::Regular, RASTER_SIZE) {
+        if let Some(res) = get_raster(c, FONT_WEIGHT, RASTER_SIZE) {
             rasterized_char = res;
         } else {
-            rasterized_char = get_raster('�', FontWeight::Regular, RASTER_SIZE).unwrap();
+            rasterized_char = get_raster('�', FONT_WEIGHT, RASTER_SIZE).unwrap();
         }
 
         let pixels = rasterized_char.raster();

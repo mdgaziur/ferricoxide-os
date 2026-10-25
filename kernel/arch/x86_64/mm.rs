@@ -19,14 +19,17 @@ use crate::arch::x86_64::mm::frame::{Frame, FrameAllocator};
 use crate::arch::x86_64::{KERNEL_CONTENT_INFO, STACKOVERFLOW_GUARD};
 use core::cmp::max;
 use core::ptr::addr_of;
-mod frame;
+pub mod frame;
 pub mod paging;
 
 use crate::arch::x86_64::mm::frame::FRAME_ALLOCATOR;
 use crate::arch::x86_64::mm::paging::flags::PageTableEntryFlags;
-use crate::arch::x86_64::mm::paging::{ActivePML4, InactivePML4, Page, TemporaryPage, identity_map_range, map_range, map_virtual_range, KernelPageAllocator, PAGE_SIZE};
+use crate::arch::x86_64::mm::paging::{
+    ActivePML4, InactivePML4, KernelPageAllocator, PAGE_SIZE, Page, TemporaryPage,
+    identity_map_range, map_range, map_virtual_range,
+};
 use crate::kutils::MB;
-use crate::{BOOT_INFO, serial_println, dbg, verify_called_once};
+use crate::{BOOT_INFO, serial_println};
 use linked_list_allocator::LockedHeap;
 use spin::{Mutex, Once};
 
@@ -94,7 +97,10 @@ pub fn init() {
             &mut *frame_allocator,
         );
         // just in case something ends up after the kernel content(somehow!)
-        heap_addr = align_up(max(kernel_end, max(boot_info_end, framebuffer_end)) + 1, PAGE_SIZE);
+        heap_addr = align_up(
+            max(kernel_end, max(boot_info_end, framebuffer_end)) + 1,
+            PAGE_SIZE,
+        );
     });
 
     unsafe {
@@ -113,9 +119,12 @@ pub fn init() {
         &mut *frame_allocator,
     );
 
-    let kernel_usable_virtual_address_space_start_addr = align_up(heap_addr + KERNEL_HEAP_SIZE + 1, PAGE_SIZE);
+    let kernel_usable_virtual_address_space_start_addr =
+        align_up(heap_addr + KERNEL_HEAP_SIZE + 1, PAGE_SIZE);
     KERNEL_PAGE_ALLOCATOR.call_once(|| {
-       Mutex::new(KernelPageAllocator::new(kernel_usable_virtual_address_space_start_addr))
+        Mutex::new(KernelPageAllocator::new(
+            kernel_usable_virtual_address_space_start_addr,
+        ))
     });
 
     // SAFETY:
@@ -163,19 +172,21 @@ pub fn identity_map(addr: PhysAddr, flags: PageTableEntryFlags) {
     );
 }
 
-pub fn allocate_page_and_map(phys_addr: PhysAddr, size: usize, flags: PageTableEntryFlags) -> Option<(usize, VirtAddr)> {
+pub fn allocate_page_and_map(
+    phys_addr: PhysAddr,
+    size: usize,
+    flags: PageTableEntryFlags,
+) -> Option<(usize, VirtAddr)> {
     let mut page_allocator = KERNEL_PAGE_ALLOCATOR.get().unwrap().lock();
     let mut frame_allocator = FRAME_ALLOCATOR.lock();
     let mut active_pml4 = ACTIVE_PML4.get().unwrap().lock();
 
-    let Some((size, virt_addr)) = page_allocator.allocate_consecutive(size) else {
-        return None;
-    };
+    let (size, virt_addr) = page_allocator.allocate_consecutive(size)?;
 
     for idx in 0..size / PAGE_SIZE {
         active_pml4.map_to(
             Page::containing_address(virt_addr + idx * PAGE_SIZE),
-            Frame::containing_address(phys_addr),
+            Frame::containing_address(phys_addr + idx * PAGE_SIZE),
             flags,
             &mut *frame_allocator,
         );

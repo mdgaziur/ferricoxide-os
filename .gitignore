@@ -2,7 +2,12 @@
 .idea
 .vscode
 
+.DS_Store
+
 # Build artifacts
 build
 target
-./prekernel/kernel_memsz.rs
+prekernel/kernel_memsz.rs
+
+OVMF.fd
+qemu.log

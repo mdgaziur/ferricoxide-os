@@ -1,12 +1,12 @@
 #![allow(unused)]
 
 use crate::arch::x86_64::cpu::cpuid::{CPUIDEDXFeature, cpuid_getfeatures};
+use crate::arch::x86_64::mm::paging::PAGE_SIZE;
 use crate::arch::x86_64::mm::paging::flags::PageTableEntryFlags;
-use crate::arch::x86_64::mm::{PhysAddr, identity_map, allocate_page_and_map};
+use crate::arch::x86_64::mm::{PhysAddr, allocate_page_and_map, identity_map};
 use crate::serial_println;
 use spin::Once;
 use x86_64::registers::model_specific::Msr;
-use crate::arch::x86_64::mm::paging::PAGE_SIZE;
 
 const IA32_APIC_BASE_MSR: u32 = 0x1B;
 const EOI_REG: u32 = 0xB0;
@@ -81,7 +81,9 @@ pub fn init() {
         PageTableEntryFlags::PRESENT
             | PageTableEntryFlags::WRITABLE
             | PageTableEntryFlags::DISABLE_CACHE,
-    ).unwrap().1;
+    )
+    .unwrap()
+    .1;
     serial_println!("APIC base: {:x?}", virtual_apic_base);
     // Safety:
     // We're just setting the APIC base address to the value we just read

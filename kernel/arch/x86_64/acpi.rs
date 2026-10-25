@@ -3,16 +3,18 @@
 
 pub mod apic;
 
-use crate::{dbg, BOOT_INFO};
 use crate::arch::x86_64::acpi::apic::APICSDT;
+use crate::arch::x86_64::mm::paging::PAGE_SIZE;
 use crate::arch::x86_64::mm::paging::flags::PageTableEntryFlags;
-use crate::arch::x86_64::mm::{PhysAddr, VirtAddr, identity_map, translate_addr, allocate_page_and_map};
+use crate::arch::x86_64::mm::{
+    PhysAddr, VirtAddr, allocate_page_and_map, identity_map, translate_addr,
+};
 use crate::serial_println;
+use crate::{BOOT_INFO, dbg};
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::slice;
 use spin::Mutex;
-use crate::arch::x86_64::mm::paging::PAGE_SIZE;
 
 pub static SDT_LIST: Mutex<Vec<ACPISDT>> = Mutex::new(Vec::new());
 
@@ -50,11 +52,17 @@ pub enum ACPISDT {
     Unknown { header: ACPISDTHeader },
 }
 
+/// TODO: the SDT is still RSDT in emulators. Properly handle XSDT as we're currently reading as RSDT.
 /// Safety:
 /// Make sure that the pointer is valid
 unsafe fn enumerate_xsdt(root_xsdt_ptr: *const RawACPISDTHeader) {
-    let root_xsdt_ptr = allocate_page_and_map(root_xsdt_ptr as PhysAddr, PAGE_SIZE, PageTableEntryFlags::PRESENT)
-        .unwrap().1 as *const RawACPISDTHeader;
+    let root_xsdt_ptr = allocate_page_and_map(
+        root_xsdt_ptr as PhysAddr,
+        PAGE_SIZE,
+        PageTableEntryFlags::PRESENT,
+    )
+    .unwrap()
+    .1 as *const RawACPISDTHeader;
 
     let root_xsdt = unsafe { &*root_xsdt_ptr };
     let entries_count = (root_xsdt.length - size_of::<RawACPISDTHeader>() as u32) as usize / 8 + 1;
@@ -63,8 +71,13 @@ unsafe fn enumerate_xsdt(root_xsdt_ptr: *const RawACPISDTHeader) {
 
     let mut sdt_list = SDT_LIST.lock();
     for sdt_ptr in sdt_ptrs {
-        let sdt_ptr = allocate_page_and_map(*sdt_ptr as PhysAddr, PAGE_SIZE, PageTableEntryFlags::PRESENT)
-            .unwrap().1 as *const RawACPISDTHeader;
+        let sdt_ptr = allocate_page_and_map(
+            *sdt_ptr as PhysAddr,
+            PAGE_SIZE,
+            PageTableEntryFlags::PRESENT,
+        )
+        .unwrap()
+        .1 as *const RawACPISDTHeader;
 
         let current_raw_sdt = unsafe { &*sdt_ptr };
         let current_sdt = ACPISDTHeader {

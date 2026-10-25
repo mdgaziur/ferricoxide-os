@@ -2,10 +2,10 @@
 
 use crate::arch::x86_64::acpi::apic::InterruptControllerStructure;
 use crate::arch::x86_64::acpi::{ACPISDT, SDT_LIST};
-use crate::arch::x86_64::mm::paging::flags::PageTableEntryFlags;
-use crate::arch::x86_64::mm::{PhysAddr, VirtAddr, identity_map, translate_addr, allocate_page_and_map};
-use spin::Once;
 use crate::arch::x86_64::mm::paging::PAGE_SIZE;
+use crate::arch::x86_64::mm::paging::flags::PageTableEntryFlags;
+use crate::arch::x86_64::mm::{PhysAddr, VirtAddr, allocate_page_and_map};
+use spin::Once;
 
 static IOAPIC_BASE: Once<VirtAddr> = Once::new();
 const IOREGSEL: usize = 0;
@@ -46,20 +46,22 @@ pub fn init() {
     for sdt in &*sdt_list {
         if let ACPISDT::APIC(apic_sdt) = sdt {
             for ics in &apic_sdt.interrupt_control_structure {
-                if let InterruptControllerStructure::IOAPIC(ioapic) = ics {
-                    if ioapic.ioapic_id == ioapic_id {
-                        let virtual_ioapic_address = allocate_page_and_map(
-                            ioapic.ioapic_address as PhysAddr,
-                            PAGE_SIZE,
-                            PageTableEntryFlags::PRESENT
-                                | PageTableEntryFlags::WRITABLE
-                                | PageTableEntryFlags::DISABLE_CACHE,
-                        ).unwrap().1;
+                if let InterruptControllerStructure::IOAPIC(ioapic) = ics
+                    && ioapic.ioapic_id == ioapic_id
+                {
+                    let virtual_ioapic_address = allocate_page_and_map(
+                        ioapic.ioapic_address as PhysAddr,
+                        PAGE_SIZE,
+                        PageTableEntryFlags::PRESENT
+                            | PageTableEntryFlags::WRITABLE
+                            | PageTableEntryFlags::DISABLE_CACHE,
+                    )
+                    .unwrap()
+                    .1;
 
-                        IOAPIC_BASE.call_once(|| virtual_ioapic_address as VirtAddr);
+                    IOAPIC_BASE.call_once(|| virtual_ioapic_address as VirtAddr);
 
-                        return;
-                    }
+                    return;
                 }
             }
         }

@@ -22,15 +22,21 @@ mod gdt;
 pub(super) mod interrupts;
 mod io;
 mod mm;
+pub mod process;
+pub mod rand;
 
+use crate::dbg;
 use crate::kutils::{KERNEL_STACK_SIZE, KernelContentInfo};
-use crate::{BOOT_INFO, display, kernel_main, serial_println};
+use crate::{BOOT_INFO, d, display, kernel_main, serial_println};
 use core::arch::naked_asm;
 use core::ptr::addr_of;
 use multiboot2::{BootInformation, BootInformationHeader};
 use spin::Once;
 
-use crate::dbg::dmesg_init;
+use crate::arch::x86_64::cpu::cpuid::{
+    CPUIDEDXFeature, cpuid_core_crystal_freq, cpuid_getfeatures,
+};
+use crate::dbg::{D_INFO, dmesg_init, dmesgln};
 pub use cpu::halt_loop;
 
 pub(super) static KERNEL_CONTENT_INFO: Once<KernelContentInfo> = Once::new();
@@ -46,6 +52,7 @@ static STACKOVERFLOW_GUARD: [u8; 4096] = [0; 4096];
 static KERNEL_STACK_TOP: &u8 = &KERNEL_STACK[KERNEL_STACK.len() - 1];
 
 #[unsafe(no_mangle)]
+#[unsafe(link_section = ".text.kernel_start")]
 #[unsafe(naked)]
 unsafe extern "C" fn kernel_start() {
     naked_asm!(
@@ -67,13 +74,18 @@ unsafe extern "C" fn kernel_start() {
         or rax, 1 << 16
         mov cr0, rax
     
-        mov rsp, KERNEL_STACK_TOP
+        movabs rax, offset {kernel_stack}
+        add rax, {kernel_stack_size}
+        mov rsp, rax
     
         // Jump to the higher half address of `actually_kernel_start`
         // so that gdb can point out which part of the kernel we are executing
-        lea rax, [actually_kernel_start]
+        movabs rax, offset {actually_start}
         push rax
-        ret"
+        ret",
+        kernel_stack_size = const KERNEL_STACK_SIZE,
+        kernel_stack = sym KERNEL_STACK,
+        actually_start = sym actually_kernel_start
     );
 }
 
@@ -85,8 +97,10 @@ fn actually_kernel_start(
     gdt::init();
 
     let mb_info = unsafe { BootInformation::load(boot_information_header).unwrap() };
+    dbg!(&BOOT_INFO);
     BOOT_INFO.call_once(|| mb_info);
     serial_println!("{:p}", kernel_content_info);
+    serial_println!("The kernel is aliveeeeeeee!!!!!!!!!!!");
     KERNEL_CONTENT_INFO.call_once(|| unsafe { *kernel_content_info });
 
     serial_println!("The kernel is aliveeeeeeee!!!!!!!!!!!");
@@ -107,6 +121,7 @@ fn actually_kernel_start(
     serial_println!("Vendor: {}", str::from_utf8(&vendor).unwrap());
     serial_println!("Vendor(bytes): {:?}", vendor);
 
+    rand::init();
     mm::init();
     acpi::init();
     interrupts::init();
@@ -114,7 +129,14 @@ fn actually_kernel_start(
         display::init();
     }
     dmesg_init();
-    
-    kernel_main();
-    loop {}
+
+    let contains_tsc = cpuid_getfeatures().1.contains(CPUIDEDXFeature::TSC);
+    if contains_tsc {
+        dmesgln(d!(D_INFO "TSC is supported"));
+        dmesgln(d!(D_INFO "TSC Frequency: {:?} Hz", cpuid_core_crystal_freq()));
+    } else {
+        dmesgln(d!(D_INFO "TSC is not supported"));
+    }
+
+    kernel_main()
 }
