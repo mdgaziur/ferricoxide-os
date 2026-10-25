@@ -56,7 +56,7 @@ class BuildMode(Enum):
 
 build_config = {
     "arch": SUPPORTED_ARCHITECTURES[0],
-    "memory": 256,
+    "memory": 512,
     "fix": False,
     "reformat": True,
     "build_mode": BuildMode.DEBUG,
@@ -64,6 +64,7 @@ build_config = {
     "boot": False,
     "extra_qemu_args": "",
     "ovmf_path": "/usr/share/ovmf/x64/OVMF.4m.fd",
+    "qemu_path": None
 }
 
 
@@ -141,7 +142,7 @@ def build_crate(crate: str, release: bool, build_dir: str):
     cur_dir = os.path.abspath(os.path.curdir)
     os.chdir(crate)
 
-    command = "cargo build"
+    command = "cargo build -Zjson-target-spec"
     if release:
         command += " --release"
 
@@ -223,11 +224,15 @@ def boot():
         return
 
     print(f"Booting from `{iso_path}`...")
-    command = (f"qemu-system-{build_config['architecture']} -m {build_config['memory']}M "
+    qemu_path = build_config['qemu_path']
+    if not qemu_path:
+        qemu_path = f"qemu-system-{build_config['architecture']}"
+    command = (f"{qemu_path} -m {build_config['memory']}M "
                f"-bios {build_config['ovmf_path']} "
                f"-cdrom {iso_path} "
                f"-d cpu_reset  -serial stdio -no-reboot -no-shutdown -s " + build_config['extra_qemu_args'])
 
+    print(command)
     execute_command(
         "boot",
         command,
@@ -247,9 +252,10 @@ def main():
     parser.add_argument("--boot", help="boot Ferricoxide OS", action='store_true')
     parser.add_argument("--reformat", help="reformat code", action='store_true')
     parser.add_argument("--fix", help="fix lint errors", action='store_true')
-    parser.add_argument("-m", "--memory", help="total memory given to the OS", default=256)
+    parser.add_argument("-m", "--memory", help="total memory given to the OS", default=build_config['memory'], type=int)
     parser.add_argument("-q", "--extra-qemu-args", help="extra arguments for QEMU(should be escaped)")
     parser.add_argument("-b", "--bios-path", help="path to bios. Default: `/usr/share/ovmf/x64/OVMF.4m.fd`", default="/usr/share/ovmf/x64/OVMF.fd")
+    parser.add_argument("-qq", "--qemu-path", help="Path to QEMU binary", default=None)
 
     args = parser.parse_args()
 
@@ -265,6 +271,7 @@ def main():
     build_config['release'] = args.release
     build_config['extra_qemu_args'] = args.extra_qemu_args if args.extra_qemu_args else ""
     build_config['ovmf_path'] = args.bios_path
+    build_config['qemu_path'] = args.qemu_path
 
 
     if build_config['fix']:
